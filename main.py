@@ -4,7 +4,7 @@ from pathlib import Path
 from functools import wraps
 import threading
 import time
-import sqlite3
+import pymysql
 
 # Load environment variables
 try:
@@ -523,9 +523,9 @@ def api_clear_chat_history():
         user_id = request.user['id']
         
         # Clear from database
-        conn = sqlite3.connect(auth_db.db_path)
+        conn = auth_db.get_connection()
         cursor = conn.cursor()
-        cursor.execute('DELETE FROM chat_history WHERE user_id = ?', (user_id,))
+        cursor.execute('DELETE FROM chat_history WHERE user_id = %s', (user_id,))
         deleted_count = cursor.rowcount
         conn.commit()
         conn.close()

@@ -1,65 +1,86 @@
-import sqlite3
+import pymysql
 import hashlib
 import secrets
 from datetime import datetime, timedelta
 from pathlib import Path
 import re
+import os
+from config import DatabaseConfig
 
 class AuthDatabase:
-    def __init__(self, db_path="users.db"):
-        self.db_path = db_path
+    def __init__(self, mysql_config=None):
+        """Initialize MySQL database connection"""
+        self.mysql_config = mysql_config or DatabaseConfig.get_mysql_config()
         self.init_database()
     
     def init_database(self):
         """Initialize the database with users table"""
-        conn = sqlite3.connect(self.db_path)
+        conn = pymysql.connect(**self.mysql_config)
         cursor = conn.cursor()
+        
+        # Create database if it doesn't exist
+        cursor.execute(f"CREATE DATABASE IF NOT EXISTS {self.mysql_config['database']}")
+        cursor.execute(f"USE {self.mysql_config['database']}")
         
         # Create users table
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS users (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                username TEXT UNIQUE NOT NULL,
-                email TEXT UNIQUE NOT NULL,
-                password_hash TEXT NOT NULL,
-                salt TEXT NOT NULL,
-                full_name TEXT NOT NULL,
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                username VARCHAR(255) UNIQUE NOT NULL,
+                email VARCHAR(255) UNIQUE NOT NULL,
+                password_hash VARCHAR(512) NOT NULL,
+                salt VARCHAR(64) NOT NULL,
+                full_name VARCHAR(255) NOT NULL,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                last_login TIMESTAMP,
+                last_login TIMESTAMP NULL,
                 is_active BOOLEAN DEFAULT 1,
-                failed_login_attempts INTEGER DEFAULT 0,
-                locked_until TIMESTAMP NULL
-            )
+                failed_login_attempts INT DEFAULT 0,
+                locked_until TIMESTAMP NULL,
+                INDEX idx_username (username),
+                INDEX idx_email (email)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
         ''')
         
         # Create sessions table for session management
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS user_sessions (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                user_id INTEGER NOT NULL,
-                session_token TEXT UNIQUE NOT NULL,
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                user_id INT NOT NULL,
+                session_token VARCHAR(255) UNIQUE NOT NULL,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 expires_at TIMESTAMP NOT NULL,
                 is_active BOOLEAN DEFAULT 1,
-                FOREIGN KEY (user_id) REFERENCES users (id)
-            )
+                FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE,
+                INDEX idx_session_token (session_token),
+                INDEX idx_user_id (user_id)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
         ''')
         
         # Create chat history table
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS chat_history (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                user_id INTEGER NOT NULL,
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                user_id INT NOT NULL,
                 message TEXT NOT NULL,
                 response TEXT NOT NULL,
                 timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                FOREIGN KEY (user_id) REFERENCES users (id)
-            )
+                FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE,
+                INDEX idx_user_id_timestamp (user_id, timestamp)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
         ''')
         
         conn.commit()
         conn.close()
-        print("Database initialized successfully")
+        print("MySQL database initialized successfully")
+    
+    def get_connection(self):
+        """Get a MySQL database connection"""
+        conn = pymysql.connect(**self.mysql_config)
+        # Select the database
+        cursor = conn.cursor()
+        cursor.execute(f"USE {self.mysql_config['database']}")
+        cursor.close()
+        return conn
     
     def hash_password(self, password):
         """Hash password with salt"""
@@ -105,11 +126,11 @@ class AuthDatabase:
             if not full_name or len(full_name) < 2:
                 return False, "Full name must be at least 2 characters long"
             
-            conn = sqlite3.connect(self.db_path)
+            conn = self.get_connection()
             cursor = conn.cursor()
             
             # Check if username or email already exists
-            cursor.execute('SELECT id FROM users WHERE username = ? OR email = ?', 
+            cursor.execute('SELECT id FROM users WHERE username = %s OR email = %s', 
                           (username, email))
             if cursor.fetchone():
                 conn.close()
@@ -121,7 +142,7 @@ class AuthDatabase:
             # Insert new user
             cursor.execute('''
                 INSERT INTO users (username, email, password_hash, salt, full_name)
-                VALUES (?, ?, ?, ?, ?)
+                VALUES (%s, %s, %s, %s, %s)
             ''', (username, email, password_hash, salt, full_name))
             
             conn.commit()
@@ -131,7 +152,7 @@ class AuthDatabase:
             print(f"User {username} registered successfully with ID {user_id}")
             return True, f"User {username} registered successfully"
             
-        except sqlite3.Error as e:
+        except pymysql.Error as e:
             print(f"Database error during registration: {str(e)}")
             return False, f"Database error: {str(e)}"
         except Exception as e:
@@ -141,7 +162,7 @@ class AuthDatabase:
     def authenticate_user(self, username_or_email, password):
         """Authenticate user login"""
         try:
-            conn = sqlite3.connect(self.db_path)
+            conn = self.get_connection()
             cursor = conn.cursor()
             
             # Get user by username or email
@@ -149,7 +170,7 @@ class AuthDatabase:
                 SELECT id, username, email, password_hash, salt, full_name, 
                        failed_login_attempts, locked_until, is_active
                 FROM users 
-                WHERE (username = ? OR email = ?) AND is_active = 1
+                WHERE (username = %s OR email = %s) AND is_active = 1
             ''', (username_or_email, username_or_email))
             
             user = cursor.fetchone()
@@ -161,14 +182,12 @@ class AuthDatabase:
             
             # Check if account is locked
             if locked_until:
-                try:
-                    locked_until_dt = datetime.fromisoformat(locked_until)
-                    if datetime.now() < locked_until_dt:
-                        conn.close()
-                        return False, f"Account locked until {locked_until_dt.strftime('%Y-%m-%d %H:%M:%S')}", None
-                except ValueError:
-                    # Invalid datetime format, clear the lock
-                    cursor.execute('UPDATE users SET locked_until = NULL WHERE id = ?', (user_id,))
+                if datetime.now() < locked_until:
+                    conn.close()
+                    return False, f"Account locked until {locked_until.strftime('%Y-%m-%d %H:%M:%S')}", None
+                else:
+                    # Clear the lock since it's expired
+                    cursor.execute('UPDATE users SET locked_until = NULL WHERE id = %s', (user_id,))
                     conn.commit()
             
             # Verify password
@@ -180,17 +199,17 @@ class AuthDatabase:
                     lock_until = datetime.now() + timedelta(minutes=30)
                     cursor.execute('''
                         UPDATE users 
-                        SET failed_login_attempts = ?, locked_until = ?
-                        WHERE id = ?
-                    ''', (failed_attempts, lock_until.isoformat(), user_id))
+                        SET failed_login_attempts = %s, locked_until = %s
+                        WHERE id = %s
+                    ''', (failed_attempts, lock_until, user_id))
                     conn.commit()
                     conn.close()
                     return False, "Too many failed attempts. Account locked for 30 minutes.", None
                 else:
                     cursor.execute('''
                         UPDATE users 
-                        SET failed_login_attempts = ?
-                        WHERE id = ?
+                        SET failed_login_attempts = %s
+                        WHERE id = %s
                     ''', (failed_attempts, user_id))
                     conn.commit()
                 
@@ -201,7 +220,7 @@ class AuthDatabase:
             cursor.execute('''
                 UPDATE users 
                 SET failed_login_attempts = 0, locked_until = NULL, last_login = CURRENT_TIMESTAMP
-                WHERE id = ?
+                WHERE id = %s
             ''', (user_id,))
             
             conn.commit()
@@ -217,7 +236,7 @@ class AuthDatabase:
             print(f"User {username} logged in successfully")
             return True, "Login successful", user_data
             
-        except sqlite3.Error as e:
+        except pymysql.Error as e:
             print(f"Database error during authentication: {str(e)}")
             return False, f"Database error: {str(e)}", None
         except Exception as e:
@@ -230,21 +249,21 @@ class AuthDatabase:
             session_token = secrets.token_urlsafe(32)
             expires_at = datetime.now() + timedelta(days=7)  # Session expires in 7 days
             
-            conn = sqlite3.connect(self.db_path)
+            conn = self.get_connection()
             cursor = conn.cursor()
             
             # Deactivate old sessions
             cursor.execute('''
                 UPDATE user_sessions 
                 SET is_active = 0 
-                WHERE user_id = ? AND is_active = 1
+                WHERE user_id = %s AND is_active = 1
             ''', (user_id,))
             
             # Create new session
             cursor.execute('''
                 INSERT INTO user_sessions (user_id, session_token, expires_at)
-                VALUES (?, ?, ?)
-            ''', (user_id, session_token, expires_at.isoformat()))
+                VALUES (%s, %s, %s)
+            ''', (user_id, session_token, expires_at))
             
             conn.commit()
             conn.close()
@@ -259,14 +278,14 @@ class AuthDatabase:
     def verify_session(self, session_token):
         """Verify session token and return user data"""
         try:
-            conn = sqlite3.connect(self.db_path)
+            conn = self.get_connection()
             cursor = conn.cursor()
             
             cursor.execute('''
                 SELECT u.id, u.username, u.email, u.full_name, s.expires_at
                 FROM users u
                 JOIN user_sessions s ON u.id = s.user_id
-                WHERE s.session_token = ? AND s.is_active = 1 AND u.is_active = 1
+                WHERE s.session_token = %s AND s.is_active = 1 AND u.is_active = 1
             ''', (session_token,))
             
             result = cursor.fetchone()
@@ -277,28 +296,16 @@ class AuthDatabase:
             user_id, username, email, full_name, expires_at = result
             
             # Check if session is expired
-            try:
-                expires_at_dt = datetime.fromisoformat(expires_at)
-                if datetime.now() > expires_at_dt:
-                    # Deactivate expired session
-                    cursor.execute('''
-                        UPDATE user_sessions 
-                        SET is_active = 0 
-                        WHERE session_token = ?
-                    ''', (session_token,))
-                    conn.commit()
-                    conn.close()
-                    print(f"Session expired for token {session_token[:10]}...")
-                    return None
-            except ValueError:
-                # Invalid datetime format, deactivate session
+            if datetime.now() > expires_at:
+                # Deactivate expired session
                 cursor.execute('''
                     UPDATE user_sessions 
                     SET is_active = 0 
-                    WHERE session_token = ?
+                    WHERE session_token = %s
                 ''', (session_token,))
                 conn.commit()
                 conn.close()
+                print(f"Session expired for token {session_token[:10]}...")
                 return None
             
             conn.close()
@@ -317,13 +324,13 @@ class AuthDatabase:
     def logout_user(self, session_token):
         """Logout user by deactivating session"""
         try:
-            conn = sqlite3.connect(self.db_path)
+            conn = self.get_connection()
             cursor = conn.cursor()
             
             cursor.execute('''
                 UPDATE user_sessions 
                 SET is_active = 0 
-                WHERE session_token = ?
+                WHERE session_token = %s
             ''', (session_token,))
             
             conn.commit()
@@ -338,12 +345,12 @@ class AuthDatabase:
     def save_chat_message(self, user_id, message, response):
         """Save chat message to history"""
         try:
-            conn = sqlite3.connect(self.db_path)
+            conn = self.get_connection()
             cursor = conn.cursor()
             
             cursor.execute('''
                 INSERT INTO chat_history (user_id, message, response)
-                VALUES (?, ?, ?)
+                VALUES (%s, %s, %s)
             ''', (user_id, message, response))
             
             conn.commit()
@@ -358,15 +365,15 @@ class AuthDatabase:
     def get_chat_history(self, user_id, limit=50):
         """Get chat history for user"""
         try:
-            conn = sqlite3.connect(self.db_path)
+            conn = self.get_connection()
             cursor = conn.cursor()
             
             cursor.execute('''
                 SELECT message, response, timestamp
                 FROM chat_history
-                WHERE user_id = ?
+                WHERE user_id = %s
                 ORDER BY timestamp DESC
-                LIMIT ?
+                LIMIT %s
             ''', (user_id, limit))
             
             history = cursor.fetchall()
@@ -382,14 +389,14 @@ class AuthDatabase:
     def get_user_stats(self, user_id):
         """Get user statistics"""
         try:
-            conn = sqlite3.connect(self.db_path)
+            conn = self.get_connection()
             cursor = conn.cursor()
             
             # Get user info
             cursor.execute('''
                 SELECT username, email, full_name, created_at, last_login
                 FROM users
-                WHERE id = ?
+                WHERE id = %s
             ''', (user_id,))
             
             user_info = cursor.fetchone()
@@ -401,7 +408,7 @@ class AuthDatabase:
             cursor.execute('''
                 SELECT COUNT(*)
                 FROM chat_history
-                WHERE user_id = ?
+                WHERE user_id = %s
             ''', (user_id,))
             
             chat_count = cursor.fetchone()[0]
@@ -410,7 +417,7 @@ class AuthDatabase:
             cursor.execute('''
                 SELECT MIN(timestamp)
                 FROM chat_history
-                WHERE user_id = ?
+                WHERE user_id = %s
             ''', (user_id,))
             
             first_chat = cursor.fetchone()[0]
@@ -434,17 +441,17 @@ class AuthDatabase:
     def delete_user_data(self, user_id):
         """Delete all user data (GDPR compliance)"""
         try:
-            conn = sqlite3.connect(self.db_path)
+            conn = self.get_connection()
             cursor = conn.cursor()
             
             # Delete chat history
-            cursor.execute('DELETE FROM chat_history WHERE user_id = ?', (user_id,))
+            cursor.execute('DELETE FROM chat_history WHERE user_id = %s', (user_id,))
             
             # Delete sessions
-            cursor.execute('DELETE FROM user_sessions WHERE user_id = ?', (user_id,))
+            cursor.execute('DELETE FROM user_sessions WHERE user_id = %s', (user_id,))
             
             # Delete user
-            cursor.execute('DELETE FROM users WHERE id = ?', (user_id,))
+            cursor.execute('DELETE FROM users WHERE id = %s', (user_id,))
             
             conn.commit()
             conn.close()
@@ -459,14 +466,14 @@ class AuthDatabase:
     def cleanup_expired_sessions(self):
         """Clean up expired sessions (run periodically)"""
         try:
-            conn = sqlite3.connect(self.db_path)
+            conn = self.get_connection()
             cursor = conn.cursor()
             
-            current_time = datetime.now().isoformat()
+            current_time = datetime.now()
             cursor.execute('''
                 UPDATE user_sessions 
                 SET is_active = 0 
-                WHERE expires_at < ? AND is_active = 1
+                WHERE expires_at < %s AND is_active = 1
             ''', (current_time,))
             
             cleaned = cursor.rowcount
@@ -483,39 +490,48 @@ class AuthDatabase:
 
 # Test the database functionality
 if __name__ == "__main__":
-    # Initialize the database
-    auth = AuthDatabase("test_users.db")
+    # Test with environment variables or fallback to default
+    print("Testing MySQL authentication database...")
+    print("Make sure MySQL is running and environment variables are set!")
     
-    print("Testing authentication database...")
-    
-    # Test registration
-    success, message = auth.register_user(
-        "testuser", 
-        "test@example.com", 
-        "TestPassword123", 
-        "Test User"
-    )
-    print(f"Registration: {success} - {message}")
-    
-    # Test login
-    success, message, user_data = auth.authenticate_user("testuser", "TestPassword123")
-    print(f"Login: {success} - {message}")
-    if user_data:
-        print(f"User data: {user_data}")
+    try:
+        # Initialize the database
+        auth = AuthDatabase()
         
-        # Test session creation
-        session_token = auth.create_session(user_data['id'])
-        print(f"Session token: {session_token}")
+        print("Testing authentication database...")
         
-        # Test session verification
-        verified_user = auth.verify_session(session_token)
-        print(f"Session verification: {verified_user}")
+        # Test registration
+        success, message = auth.register_user(
+            "testuser", 
+            "test@example.com", 
+            "TestPassword123", 
+            "Test User"
+        )
+        print(f"Registration: {success} - {message}")
         
-        # Test chat saving
-        auth.save_chat_message(user_data['id'], "Hello", "Hi there!")
+        # Test login
+        success, message, user_data = auth.authenticate_user("testuser", "TestPassword123")
+        print(f"Login: {success} - {message}")
+        if user_data:
+            print(f"User data: {user_data}")
+            
+            # Test session creation
+            session_token = auth.create_session(user_data['id'])
+            print(f"Session token: {session_token}")
+            
+            # Test session verification
+            verified_user = auth.verify_session(session_token)
+            print(f"Session verification: {verified_user}")
+            
+            # Test chat saving
+            auth.save_chat_message(user_data['id'], "Hello", "Hi there!")
+            
+            # Test chat history
+            history = auth.get_chat_history(user_data['id'])
+            print(f"Chat history: {history}")
         
-        # Test chat history
-        history = auth.get_chat_history(user_data['id'])
-        print(f"Chat history: {history}")
-    
-    print("Database test completed!")
+        print("Database test completed!")
+        
+    except Exception as e:
+        print(f"Database test failed: {e}")
+        print("Please check your MySQL connection and environment variables.")
