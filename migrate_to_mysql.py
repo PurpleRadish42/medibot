@@ -1,224 +1,230 @@
 #!/usr/bin/env python3
 """
-Migration script to transfer data from SQLite to MySQL
+Database initialization script for MySQL
 """
-import sqlite3
-import pymysql
 import os
-from datetime import datetime
+import pymysql
+from dotenv import load_dotenv
 from config import DatabaseConfig
 
-def migrate_sqlite_to_mysql(sqlite_db_path="users.db"):
-    """Migrate data from SQLite to MySQL"""
+# Load environment variables from .env file
+load_dotenv()
+
+def init_mysql_database():
+    """Initialize MySQL database and tables"""
     
-    print("🔄 Starting SQLite to MySQL migration...")
+    print("🔧 Initializing MySQL database...")
     
-    # Check if SQLite database exists
-    if not os.path.exists(sqlite_db_path):
-        print(f"❌ SQLite database '{sqlite_db_path}' not found!")
-        return False
+    mysql_config = DatabaseConfig.get_mysql_config()
     
     try:
-        # Connect to SQLite
-        sqlite_conn = sqlite3.connect(sqlite_db_path)
-        sqlite_cursor = sqlite_conn.cursor()
+        # Connect to MySQL server (without selecting database)
+        server_config = mysql_config.copy()
+        database_name = server_config.pop('database')
         
-        # Connect to MySQL
-        mysql_config = DatabaseConfig.get_mysql_config()
-        mysql_conn = pymysql.connect(**mysql_config)
-        mysql_cursor = mysql_conn.cursor()
+        # Add SSL configuration for online databases
+        ssl_enabled = os.getenv('MYSQL_SSL_ENABLED', 'true').lower() == 'true'
+        if ssl_enabled:
+            server_config['ssl'] = {
+                'ssl_disabled': False
+            }
+            # Add custom SSL cert if provided
+            ssl_ca = os.getenv('MYSQL_SSL_CA')
+            if ssl_ca:
+                server_config['ssl']['ca'] = ssl_ca
         
-        # Select MySQL database
-        mysql_cursor.execute(f"USE {mysql_config['database']}")
+        conn = pymysql.connect(**server_config)
+        cursor = conn.cursor()
         
-        print("✅ Connected to both databases")
+        # Create database if it doesn't exist
+        cursor.execute(f"CREATE DATABASE IF NOT EXISTS {database_name}")
+        print(f"✅ Database '{database_name}' created/verified")
         
-        # Migrate users table
-        print("\n📋 Migrating users...")
-        sqlite_cursor.execute("SELECT * FROM users")
-        users = sqlite_cursor.fetchall()
+        # Create user if needed (optional)
+        try:
+            username = mysql_config['user']
+            password = mysql_config['password']
+            
+            if username != 'root' and password:
+                cursor.execute(f"CREATE USER IF NOT EXISTS '{username}'@'%' IDENTIFIED BY '{password}'")
+                cursor.execute(f"GRANT ALL PRIVILEGES ON {database_name}.* TO '{username}'@'%'")
+                cursor.execute("FLUSH PRIVILEGES")
+                print(f"✅ User '{username}' created/verified with privileges")
+        except Exception as e:
+            print(f"⚠️  User creation skipped: {e}")
         
-        # Get column names from SQLite
-        sqlite_cursor.execute("PRAGMA table_info(users)")
-        columns = [column[1] for column in sqlite_cursor.fetchall()]
+        cursor.close()
+        conn.close()
         
-        migrated_users = 0
-        for user in users:
-            try:
-                # Create user dict
-                user_dict = dict(zip(columns, user))
-                
-                # Check if user already exists in MySQL
-                mysql_cursor.execute("SELECT id FROM users WHERE username = %s OR email = %s", 
-                                   (user_dict['username'], user_dict['email']))
-                if mysql_cursor.fetchone():
-                    print(f"⚠️  User {user_dict['username']} already exists, skipping...")
-                    continue
-                
-                # Insert user into MySQL
-                mysql_cursor.execute('''
-                    INSERT INTO users (username, email, password_hash, salt, full_name, 
-                                     created_at, last_login, is_active, failed_login_attempts, locked_until)
-                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-                ''', (
-                    user_dict['username'], user_dict['email'], user_dict['password_hash'],
-                    user_dict['salt'], user_dict['full_name'], user_dict['created_at'],
-                    user_dict['last_login'], user_dict['is_active'], 
-                    user_dict['failed_login_attempts'], user_dict['locked_until']
-                ))
-                
-                migrated_users += 1
-                print(f"✅ Migrated user: {user_dict['username']}")
-                
-            except Exception as e:
-                print(f"❌ Error migrating user {user_dict.get('username', 'unknown')}: {e}")
-        
-        print(f"📊 Migrated {migrated_users} users")
-        
-        # Migrate user_sessions table
-        print("\n🔑 Migrating user sessions...")
-        sqlite_cursor.execute("SELECT * FROM user_sessions")
-        sessions = sqlite_cursor.fetchall()
-        
-        # Get column names from SQLite
-        sqlite_cursor.execute("PRAGMA table_info(user_sessions)")
-        session_columns = [column[1] for column in sqlite_cursor.fetchall()]
-        
-        migrated_sessions = 0
-        for session in sessions:
-            try:
-                session_dict = dict(zip(session_columns, session))
-                
-                # Find corresponding MySQL user ID
-                mysql_cursor.execute("SELECT id FROM users WHERE id = %s", (session_dict['user_id'],))
-                mysql_user = mysql_cursor.fetchone()
-                
-                if not mysql_user:
-                    print(f"⚠️  User ID {session_dict['user_id']} not found in MySQL, skipping session...")
-                    continue
-                
-                # Insert session into MySQL
-                mysql_cursor.execute('''
-                    INSERT INTO user_sessions (user_id, session_token, created_at, expires_at, is_active)
-                    VALUES (%s, %s, %s, %s, %s)
-                ''', (
-                    session_dict['user_id'], session_dict['session_token'],
-                    session_dict['created_at'], session_dict['expires_at'],
-                    session_dict['is_active']
-                ))
-                
-                migrated_sessions += 1
-                
-            except Exception as e:
-                print(f"❌ Error migrating session: {e}")
-        
-        print(f"📊 Migrated {migrated_sessions} sessions")
-        
-        # Migrate chat_history table
-        print("\n💬 Migrating chat history...")
-        sqlite_cursor.execute("SELECT * FROM chat_history")
-        chats = sqlite_cursor.fetchall()
-        
-        # Get column names from SQLite
-        sqlite_cursor.execute("PRAGMA table_info(chat_history)")
-        chat_columns = [column[1] for column in sqlite_cursor.fetchall()]
-        
-        migrated_chats = 0
-        for chat in chats:
-            try:
-                chat_dict = dict(zip(chat_columns, chat))
-                
-                # Find corresponding MySQL user ID
-                mysql_cursor.execute("SELECT id FROM users WHERE id = %s", (chat_dict['user_id'],))
-                mysql_user = mysql_cursor.fetchone()
-                
-                if not mysql_user:
-                    print(f"⚠️  User ID {chat_dict['user_id']} not found in MySQL, skipping chat...")
-                    continue
-                
-                # Insert chat into MySQL
-                mysql_cursor.execute('''
-                    INSERT INTO chat_history (user_id, message, response, timestamp)
-                    VALUES (%s, %s, %s, %s)
-                ''', (
-                    chat_dict['user_id'], chat_dict['message'],
-                    chat_dict['response'], chat_dict['timestamp']
-                ))
-                
-                migrated_chats += 1
-                
-            except Exception as e:
-                print(f"❌ Error migrating chat: {e}")
-        
-        print(f"📊 Migrated {migrated_chats} chat messages")
-        
-        # Commit all changes
-        mysql_conn.commit()
-        
-        # Close connections
-        sqlite_conn.close()
-        mysql_conn.close()
-        
-        print(f"\n🎉 Migration completed successfully!")
-        print(f"   Users: {migrated_users}")
-        print(f"   Sessions: {migrated_sessions}")
-        print(f"   Chat messages: {migrated_chats}")
+        # Now initialize tables using AuthDatabase
+        print("🔧 Initializing tables...")
+        from auth import AuthDatabase
+        auth_db = AuthDatabase()
+        print("✅ All tables created successfully")
         
         return True
         
     except Exception as e:
-        print(f"❌ Migration failed: {e}")
+        print(f"❌ Database initialization failed: {e}")
         return False
 
-def backup_sqlite_database(sqlite_db_path="users.db", backup_path=None):
-    """Create a backup of the SQLite database before migration"""
+def test_mysql_connection():
+    """Test MySQL connection"""
     
-    if not os.path.exists(sqlite_db_path):
-        print(f"❌ SQLite database '{sqlite_db_path}' not found!")
-        return False
-    
-    if backup_path is None:
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        backup_path = f"users_backup_{timestamp}.db"
+    print("🧪 Testing MySQL connection...")
     
     try:
-        import shutil
-        shutil.copy2(sqlite_db_path, backup_path)
-        print(f"✅ SQLite database backed up to: {backup_path}")
-        return True
+        mysql_config = DatabaseConfig.get_mysql_config()
+        
+        # Add SSL configuration for online databases
+        ssl_enabled = os.getenv('MYSQL_SSL_ENABLED', 'true').lower() == 'true'
+        if ssl_enabled:
+            mysql_config['ssl'] = {
+                'ssl_disabled': False
+            }
+            # Add custom SSL cert if provided
+            ssl_ca = os.getenv('MYSQL_SSL_CA')
+            if ssl_ca:
+                mysql_config['ssl']['ca'] = ssl_ca
+        
+        conn = pymysql.connect(**mysql_config)
+        
+        cursor = conn.cursor()
+        cursor.execute(f"USE {mysql_config['database']}")
+        cursor.execute("SELECT 1")
+        result = cursor.fetchone()
+        
+        cursor.close()
+        conn.close()
+        
+        if result and result[0] == 1:
+            print("✅ MySQL connection successful")
+            return True
+        else:
+            print("❌ MySQL connection test failed")
+            return False
+            
     except Exception as e:
-        print(f"❌ Backup failed: {e}")
+        print(f"❌ MySQL connection failed: {e}")
+        print("Please check your MySQL server and credentials")
         return False
+
+def show_database_info():
+    """Show database configuration info"""
+    
+    print("📋 Database Configuration:")
+    mysql_config = DatabaseConfig.get_mysql_config()
+    
+    print(f"   Host: {mysql_config['host']}")
+    print(f"   Port: {mysql_config['port']}")
+    print(f"   Database: {mysql_config['database']}")
+    print(f"   Username: {mysql_config['user']}")
+    print(f"   Password: {'*' * len(mysql_config['password']) if mysql_config['password'] else 'Not set'}")
+
+def check_env_variables():
+    """Check if all required environment variables are loaded"""
+    
+    # Try different common variable name patterns
+    env_patterns = {
+        'host': ['MYSQL_HOST', 'DB_HOST', 'DATABASE_HOST'],
+        'username': ['MYSQL_USERNAME', 'MYSQL_USER', 'DB_USERNAME', 'DB_USER', 'DATABASE_USER'],
+        'password': ['MYSQL_PASSWORD', 'DB_PASSWORD', 'DATABASE_PASSWORD'],
+        'database': ['MYSQL_DATABASE', 'DB_NAME', 'DATABASE_NAME'],
+        'port': ['MYSQL_PORT', 'DB_PORT', 'DATABASE_PORT'],
+        'ssl_enabled': ['MYSQL_SSL_ENABLED', 'DB_SSL_ENABLED'],
+        'ssl_ca': ['MYSQL_SSL_CA', 'DB_SSL_CA']
+    }
+    
+    found_vars = {}
+    missing_vars = []
+    
+    for var_type, possible_names in env_patterns.items():
+        found = False
+        for name in possible_names:
+            if os.getenv(name):
+                found_vars[var_type] = (name, os.getenv(name))
+                found = True
+                break
+        
+        if not found and var_type not in ['port', 'ssl_enabled', 'ssl_ca']:  # These are optional
+            missing_vars.append(var_type)
+    
+    return found_vars, missing_vars
 
 if __name__ == "__main__":
-    print("🔄 SQLite to MySQL Migration Tool")
+    print("🔧 MySQL Database Initialization")
     print("=" * 50)
     
-    # Check environment variables
-    required_vars = ['MYSQL_HOST', 'MYSQL_USERNAME', 'MYSQL_PASSWORD', 'MYSQL_DATABASE']
-    missing_vars = [var for var in required_vars if not os.getenv(var)]
+    # Check if .env file exists
+    if not os.path.exists('.env'):
+        print("⚠️  No .env file found in current directory")
+        print("Please create a .env file with your database credentials")
+        print("\nExample .env file:")
+        print("MYSQL_HOST=your_mysql_host")
+        print("MYSQL_USERNAME=your_username")
+        print("MYSQL_PASSWORD=your_password")
+        print("MYSQL_DATABASE=your_database_name")
+        print("MYSQL_PORT=3306")
+        print("MYSQL_SSL_ENABLED=true")
+        print("# MYSQL_SSL_CA=/path/to/ca-cert.pem  # Optional, only if your provider requires it")
+        exit(1)
+    else:
+        print("✅ Found .env file")
+    
+    # Check environment variables with flexible naming
+    found_vars, missing_vars = check_env_variables()
     
     if missing_vars:
-        print(f"❌ Missing environment variables: {', '.join(missing_vars)}")
-        print("Please set the following environment variables:")
-        for var in missing_vars:
-            print(f"   export {var}=your_value")
+        print(f"❌ Missing environment variables for: {', '.join(missing_vars)}")
+        print("\nPlease add the following to your .env file:")
+        
+        suggestions = {
+            'host': 'MYSQL_HOST=your_mysql_host',
+            'username': 'MYSQL_USERNAME=your_username',
+            'password': 'MYSQL_PASSWORD=your_password',
+            'database': 'MYSQL_DATABASE=your_database_name'
+        }
+        
+        for var_type in missing_vars:
+            print(f"   {suggestions.get(var_type, f'{var_type.upper()}=your_value')}")
         exit(1)
     
-    # Backup SQLite database
-    if backup_sqlite_database():
-        print("✅ Backup completed")
-    else:
-        print("❌ Backup failed, stopping migration")
+    print("✅ All required environment variables found:")
+    for var_type, (name, value) in found_vars.items():
+        if var_type == 'password':
+            print(f"   {name}: {'*' * len(value) if value else 'Not set'}")
+        else:
+            print(f"   {name}: {value}")
+    print()
+    
+    # Show configuration
+    try:
+        show_database_info()
+        print()
+    except Exception as e:
+        print(f"❌ Error getting database config: {e}")
+        print("Please check your config.py file")
         exit(1)
     
-    # Run migration
-    if migrate_sqlite_to_mysql():
-        print("\n🎉 Migration completed successfully!")
-        print("\nNext steps:")
-        print("1. Test the application with MySQL")
-        print("2. If everything works, you can remove the SQLite database")
-        print("3. Update your production environment with MySQL credentials")
+    # Test connection
+    if not test_mysql_connection():
+        # If connection fails, try to initialize database
+        print("🔧 Connection failed, attempting to initialize database...")
+        if init_mysql_database():
+            print("✅ Database initialization completed")
+            if test_mysql_connection():
+                print("✅ Connection now working")
+            else:
+                print("❌ Connection still failing")
+                exit(1)
+        else:
+            print("❌ Database initialization failed")
+            exit(1)
     else:
-        print("❌ Migration failed!")
-        exit(1)
+        print("✅ Database connection already working")
+        
+    print("\n🎉 MySQL database is ready!")
+    print("\nYou can now:")
+    print("1. Run the main application")
+    print("2. Run migration script if you have SQLite data to transfer")
+    print("3. Start using the application with MySQL backend")
