@@ -1,0 +1,358 @@
+"""
+Doctor recommendation system - FIXED for your exact CSV specialties
+"""
+import pandas as pd
+import re
+from pathlib import Path
+from typing import List, Dict, Optional
+import logging
+from markupsafe import Markup
+
+class DoctorRecommender:
+    def __init__(self, csv_path: str = "cleaned_doctors_full.csv"):
+        self.csv_path = csv_path
+        self.doctors_df = None
+        
+        # EXACT MAPPING to your CSV specialties
+        self.specialty_mapping = {
+            # Map AI recommendations to your exact CSV specialties
+            "ophthalmologist": "Ophthalmologist",
+            "eye specialist": "Ophthalmologist", 
+            "cardiologist": "Cardiologist",
+            "dermatologist": "Dermatologist",
+            "gastroenterologist": "Gastroenterologist",
+            "gynecologist": "Gynecologist",
+            "neurologist": "Neurologist",
+            "orthopedist": "Orthopedist",
+            "pediatrician": "Pediatrician",
+            "psychiatrist": "Psychiatrist",
+            "pulmonologist": "Pulmonologist",
+            "rheumatologist": "Rheumatologist",
+            "urologist": "Urologist",
+            "general practitioner": "General Physician",
+            "gp": "General Physician",
+            "ent specialist": "ENT Specialist",
+            "endocrinologist": "Endocrinologist",
+            "nephrologist": "Nephrologist",
+            "oncologist": "Oncologist",
+            
+            # Additional mappings
+            "dentist": "Dentist",
+            "chiropractor": "Chiropractor",
+            "dietitian": "Dietitian/Nutritionist",
+            "nutritionist": "Dietitian/Nutritionist",
+            "infertility specialist": "Infertility Specialist",
+            "neurosurgeon": "Neurosurgeon",
+            "physiotherapist": "Physiotherapist",
+            "radiologist": "Radiologist",
+            "pathologist": "Pathologist",
+            "anesthesiologist": "Anesthesiologist",
+            "emergency medicine physician": "Emergency Medicine Physician",
+            "geriatrician": "Geriatrician",
+            "plastic surgeon": "Plastic Surgeon",
+            "vascular surgeon": "Vascular Surgeon",
+            "thoracic surgeon": "Thoracic Surgeon",
+            "bariatric surgeon": "bariatric surgeon",
+            "homeopath": "Homeopath",
+            "ayurveda": "Ayurveda",
+            "unani": "Unani",
+            "sexologist": "Sexologist",
+            "cosmetologist": "Cosmetologist"
+        }
+        
+        self.load_doctors_data()
+    
+    def load_doctors_data(self):
+        """Load and preprocess doctors data from CSV"""
+        try:
+            file_path = Path(self.csv_path)
+            if not file_path.exists():
+                print(f"❌ CSV file not found: {self.csv_path}")
+                return False
+            
+            self.doctors_df = pd.read_csv(self.csv_path)
+            print(f"📊 Loaded CSV with {len(self.doctors_df)} rows")
+            
+            # DON'T convert specialty to lowercase - keep original case
+            self.doctors_df['speciality'] = self.doctors_df['speciality'].fillna('')
+            self.doctors_df['name'] = self.doctors_df['name'].fillna('Unknown')
+            self.doctors_df['city'] = self.doctors_df['city'].fillna('Unknown')
+            self.doctors_df['consultation_fee'] = pd.to_numeric(self.doctors_df['consultation_fee'], errors='coerce')
+            self.doctors_df['year_of_experience'] = pd.to_numeric(self.doctors_df['year_of_experience'], errors='coerce')
+            self.doctors_df['dp_score'] = pd.to_numeric(self.doctors_df['dp_score'], errors='coerce')
+            
+            print(f"✅ Loaded {len(self.doctors_df)} doctors from CSV")
+            print(f"📊 Unique specialties: {self.doctors_df['speciality'].nunique()}")
+            
+            # Show available specialties for debugging
+            print("🔍 Available specialties in CSV:")
+            unique_specialties = sorted(self.doctors_df['speciality'].unique())
+            for specialty in unique_specialties:
+                count = len(self.doctors_df[self.doctors_df['speciality'] == specialty])
+                print(f"  • {specialty} ({count} doctors)")
+            
+            return True
+            
+        except Exception as e:
+            print(f"❌ Error loading CSV: {e}")
+            return False
+    
+    def find_specialty_match(self, recommended_specialist: str) -> str:
+        """Find exact matching specialty in CSV - SIMPLIFIED"""
+        recommended_lower = recommended_specialist.lower().strip()
+        
+        print(f"🔍 Looking for: '{recommended_specialist}'")
+        
+        # Direct mapping to exact CSV specialty
+        if recommended_lower in self.specialty_mapping:
+            exact_specialty = self.specialty_mapping[recommended_lower]
+            print(f"✅ Found mapping: '{recommended_specialist}' → '{exact_specialty}'")
+            return exact_specialty
+        
+        # Fallback: try partial matching
+        available_specialties = self.doctors_df['speciality'].unique()
+        for specialty in available_specialties:
+            if recommended_lower in specialty.lower():
+                print(f"✅ Found partial match: '{specialty}'")
+                return specialty
+        
+        print(f"❌ No match found for '{recommended_specialist}'")
+        return None
+    
+    def recommend_doctors(self, specialist_type: str, city: str = None, limit: int = 5) -> List[Dict]:
+        """Recommend doctors based on specialist type - SIMPLIFIED"""
+        if self.doctors_df is None:
+            print("❌ No doctor data loaded")
+            return []
+        
+        try:
+            print(f"\n🏥 Searching for {specialist_type}" + (f" in {city}" if city else ""))
+            
+            # Find exact matching specialty
+            exact_specialty = self.find_specialty_match(specialist_type)
+            
+            if not exact_specialty:
+                print("❌ No matching specialty found")
+                return []
+            
+            # Filter doctors by exact specialty match
+            filtered_doctors = self.doctors_df[
+                self.doctors_df['speciality'] == exact_specialty
+            ].copy()
+            
+            print(f"🔍 Found {len(filtered_doctors)} {exact_specialty}s in database")
+            
+            # Filter by city if provided
+            if city and len(filtered_doctors) > 0:
+                city_filtered = filtered_doctors[
+                    filtered_doctors['city'].str.contains(city, case=False, na=False)
+                ]
+                
+                if len(city_filtered) > 0:
+                    filtered_doctors = city_filtered
+                    print(f"🏙️ Filtered to {len(filtered_doctors)} doctors in {city}")
+                else:
+                    print(f"⚠️ No {exact_specialty}s found in {city}, showing all locations")
+            
+            if len(filtered_doctors) == 0:
+                print("❌ No doctors found after filtering")
+                return []
+            
+            # Sort by score, experience, and fees
+            # Fill NaN values for sorting
+            filtered_doctors['dp_score'] = filtered_doctors['dp_score'].fillna(0)
+            filtered_doctors['year_of_experience'] = filtered_doctors['year_of_experience'].fillna(0)
+            filtered_doctors['consultation_fee'] = filtered_doctors['consultation_fee'].fillna(999999)
+            
+            # Sort: Best score first, most experience first, lowest fee first
+            filtered_doctors = filtered_doctors.sort_values([
+                'dp_score', 'year_of_experience', 'consultation_fee'
+            ], ascending=[False, False, True])
+            
+            # Get top recommendations
+            top_doctors = filtered_doctors.head(limit)
+            print(f"👨‍⚕️ Returning top {len(top_doctors)} {exact_specialty}s")
+            
+            # Format recommendations
+            recommendations = []
+            for _, doctor in top_doctors.iterrows():
+                # Clean and format the data
+                experience = doctor.get('year_of_experience', 0)
+                fee = doctor.get('consultation_fee', 0)
+                score = doctor.get('dp_score', 0)
+                
+                recommendations.append({
+                    'name': str(doctor['name']),
+                    'specialty': str(doctor['speciality']),
+                    'degree': str(doctor.get('degree', 'Not specified')),
+                    'experience': f"{int(experience)} years" if experience > 0 else 'Experience not specified',
+                    'city': str(doctor['city']),
+                    'location': str(doctor.get('location', 'Location not specified')),
+                    'consultation_fee': f"₹{int(fee)}" if fee > 0 and fee < 999999 else 'Fee not specified',
+                    'score': f"{score:.1f}/5" if score > 0 else 'Not rated',
+                    'profile_url': str(doctor.get('profile_url', '')),
+                    'google_map_link': str(doctor.get('google_map_link', ''))
+                })
+            
+            return recommendations
+            
+        except Exception as e:
+            print(f"❌ Error in doctor recommendation: {e}")
+            import traceback
+            traceback.print_exc()
+            return []
+    
+    def format_doctor_recommendations(self, doctors: List[Dict], specialist_type: str) -> str:
+        """Format doctor recommendations for chat response"""
+        if not doctors:
+            return f"I recommend consulting a {specialist_type}. Unfortunately, I don't have specific doctor recommendations available in your area right now. Please consult your local healthcare directory or contact your nearest hospital."
+        
+        response = f"Based on your symptoms, I recommend consulting a {specialist_type}. Here are {len(doctors)} qualified doctors I found:\n\n"
+        
+        for i, doctor in enumerate(doctors, 1):
+            response += f"🏥 **{i}. Dr. {doctor['name']}**\n"
+            response += f"   • Specialty: {doctor['specialty']}\n"
+            response += f"   • Qualification: {doctor['degree']}\n"
+            response += f"   • Experience: {doctor['experience']}\n"
+            response += f"   • Location: {doctor['location']}, {doctor['city']}\n"
+            response += f"   • Consultation Fee: {doctor['consultation_fee']}\n"
+            response += f"   • Rating: {doctor['score']}\n"
+            
+            if doctor['profile_url'] and doctor['profile_url'] != 'nan':
+                response += f"   • Profile: {doctor['profile_url']}\n"
+            if doctor['google_map_link'] and doctor['google_map_link'] != 'nan':
+                response += f"   • Maps: {doctor['google_map_link']}\n"
+            
+            response += "\n"
+        
+        response += "📋 **Important Notes:**\n"
+        response += "• Please verify doctor availability before visiting\n"
+        response += "• Consultation fees may have changed\n"
+        response += "• In case of emergency, visit the nearest hospital immediately\n"
+        response += "• This is for informational purposes only"
+        
+        return response
+
+    # def format_doctor_recommendations(self, doctors: List[Dict], specialist_type: str):
+    #     """Format doctor recommendations for chat response as HTML table"""
+    #     if not doctors:
+    #         return Markup(f"I recommend consulting a {specialist_type}. Unfortunately, I don't have specific doctor recommendations available in your area right now. Please consult your local healthcare directory or contact your nearest hospital.")
+    
+    #     response = f"<p>Based on your symptoms, I recommend consulting a <strong>{specialist_type}</strong>. Here are {len(doctors)} qualified doctors I found:</p>\n\n"
+    
+    #     # Start the HTML table
+    #     response += """
+    #     <table style="border-collapse: collapse; width: 100%; margin: 20px 0; font-family: Arial, sans-serif;">
+    #         <thead>
+    #             <tr style="background-color: #f8f9fa; border-bottom: 2px solid #dee2e6;">
+    #                 <th style="border: 1px solid #dee2e6; padding: 12px; text-align: left;">#</th>
+    #                 <th style="border: 1px solid #dee2e6; padding: 12px; text-align: left;">Doctor Name</th>
+    #                 <th style="border: 1px solid #dee2e6; padding: 12px; text-align: left;">Specialty</th>
+    #                 <th style="border: 1px solid #dee2e6; padding: 12px; text-align: left;">Qualification</th>
+    #                 <th style="border: 1px solid #dee2e6; padding: 12px; text-align: left;">Experience</th>
+    #                 <th style="border: 1px solid #dee2e6; padding: 12px; text-align: left;">Location</th>
+    #                 <th style="border: 1px solid #dee2e6; padding: 12px; text-align: left;">Consultation Fee</th>
+    #                 <th style="border: 1px solid #dee2e6; padding: 12px; text-align: left;">Rating</th>
+    #                 <th style="border: 1px solid #dee2e6; padding: 12px; text-align: left;">Profile</th>
+    #                 <th style="border: 1px solid #dee2e6; padding: 12px; text-align: left;">Location Map</th>
+    #             </tr>
+    #         </thead>
+    #         <tbody>
+    #     """
+    
+    #     for i, doctor in enumerate(doctors, 1):
+    #         # Handle profile URL
+    #         profile_link = ""
+    #         if doctor['profile_url'] and doctor['profile_url'] != 'nan':
+    #             profile_link = f'<a href="{doctor["profile_url"]}" target="_blank" style="color: #007bff; text-decoration: none;">Click here</a>'
+    #         else:
+    #             profile_link = "Not available"
+            
+    #         # Handle Google Maps link
+    #         maps_link = ""
+    #         if doctor['google_map_link'] and doctor['google_map_link'] != 'nan':
+    #             maps_link = f'<a href="{doctor["google_map_link"]}" target="_blank" style="color: #007bff; text-decoration: none;">Click here</a>'
+    #         else:
+    #             maps_link = "Not available"
+            
+    #         # Add table row
+    #         row_style = "background-color: #ffffff;" if i % 2 == 1 else "background-color: #f8f9fa;"
+    #         response += f"""
+    #             <tr style="{row_style}">
+    #                 <td style="border: 1px solid #dee2e6; padding: 10px; text-align: center; font-weight: bold;">{i}</td>
+    #                 <td style="border: 1px solid #dee2e6; padding: 10px;"><strong>Dr. {doctor['name']}</strong></td>
+    #                 <td style="border: 1px solid #dee2e6; padding: 10px;">{doctor['specialty']}</td>
+    #                 <td style="border: 1px solid #dee2e6; padding: 10px;">{doctor['degree']}</td>
+    #                 <td style="border: 1px solid #dee2e6; padding: 10px;">{doctor['experience']}</td>
+    #                 <td style="border: 1px solid #dee2e6; padding: 10px;">{doctor['location']}, {doctor['city']}</td>
+    #                 <td style="border: 1px solid #dee2e6; padding: 10px;">{doctor['consultation_fee']}</td>
+    #                 <td style="border: 1px solid #dee2e6; padding: 10px; text-align: center;"><strong>{doctor['score']}</strong></td>
+    #                 <td style="border: 1px solid #dee2e6; padding: 10px; text-align: center;">{profile_link}</td>
+    #                 <td style="border: 1px solid #dee2e6; padding: 10px; text-align: center;">{maps_link}</td>
+    #             </tr>
+    #         """
+    
+    #     # Close the table
+    #     response += """
+    #         </tbody>
+    #     </table>
+    #     """
+    
+    #     # Add important notes
+    #     response += """
+    #     <div style="margin-top: 20px; padding: 15px; background-color: #e9ecef; border-radius: 5px; font-family: Arial, sans-serif;">
+    #         <h4 style="margin-top: 0; color: #495057;">📋 Important Notes:</h4>
+    #         <ul style="margin-bottom: 0; color: #6c757d;">
+    #             <li>Please verify doctor availability before visiting</li>
+    #             <li>Consultation fees may have changed</li>
+    #             <li>In case of emergency, visit the nearest hospital immediately</li>
+    #             <li>This is for informational purposes only</li>
+    #         </ul>
+    #     </div>
+    #     """
+    
+    #     return Markup(response)
+    
+    def get_statistics(self) -> Dict:
+        """Get statistics about the doctors database"""
+        if self.doctors_df is None:
+            return {}
+        
+        return {
+            'total_doctors': len(self.doctors_df),
+            'total_cities': self.doctors_df['city'].nunique(),
+            'total_specialties': self.doctors_df['speciality'].nunique(),
+            'avg_experience': float(self.doctors_df['year_of_experience'].mean()) if not self.doctors_df['year_of_experience'].isna().all() else 0,
+            'avg_consultation_fee': float(self.doctors_df['consultation_fee'].mean()) if not self.doctors_df['consultation_fee'].isna().all() else 0,
+            'top_cities': self.doctors_df['city'].value_counts().head(5).to_dict(),
+            'top_specialties': self.doctors_df['speciality'].value_counts().head(10).to_dict()
+        }
+
+# Test the system
+if __name__ == "__main__":
+    print("🧪 TESTING OPHTHALMOLOGIST SEARCH")
+    print("=" * 50)
+    
+    recommender = DoctorRecommender()
+    
+    if recommender.doctors_df is not None:
+        # Test ophthalmologist search
+        test_cases = [
+            ("ophthalmologist", "Mumbai"),
+            ("eye specialist", "Delhi"),
+            ("cardiologist", "Bangalore"),
+            ("general practitioner", None)
+        ]
+        
+        for specialist, city in test_cases:
+            print(f"\n🔍 Testing: {specialist}" + (f" in {city}" if city else ""))
+            doctors = recommender.recommend_doctors(specialist, city, limit=3)
+            
+            if doctors:
+                print(f"✅ Found {len(doctors)} doctors:")
+                for i, doctor in enumerate(doctors, 1):
+                    print(f"  {i}. Dr. {doctor['name']} - {doctor['specialty']} - {doctor['city']}")
+            else:
+                print(f"❌ No {specialist} found")
+    else:
+        print("❌ Failed to load doctors data")

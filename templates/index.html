@@ -1,0 +1,154 @@
+{% extends "base.html" %}
+
+{% block title %}MedBot AI - Your Personal Medical Assistant{% endblock %}
+
+{% block nav_home %}active{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="hero-section">
+        <h1>🏥 Welcome to MedBot AI</h1>
+        <p>Your intelligent medical assistant powered by advanced AI technology. Get instant answers to your health questions, symptom analysis, and medical guidance available 24/7.</p>
+    </div>
+
+    <div class="cta-section">
+        <h2 style="color: white; margin-bottom: 1rem; font-size: 2rem;">Start Your Health Journey</h2>
+        <div class="cta-buttons">
+            <a href="/chat" class="btn btn-primary">
+                <i class="fas fa-comments"></i>
+                Start Chatting
+            </a>
+            <a href="/gradio" class="btn btn-secondary">
+                <i class="fas fa-robot"></i>
+                AI Interface
+            </a>
+        </div>
+    </div>
+
+    <div class="features-grid">
+        <div class="feature-card" onclick="window.location.href='/chat'">
+            <div class="feature-icon">
+                <i class="fas fa-user-md"></i>
+            </div>
+            <h3>Expert Medical Guidance</h3>
+            <p>Get professional-level medical information and guidance based on the latest medical knowledge and research.</p>
+        </div>
+
+        <div class="feature-card" onclick="window.location.href='/chat'">
+            <div class="feature-icon">
+                <i class="fas fa-clock"></i>
+            </div>
+            <h3>24/7 Availability</h3>
+            <p>Access medical assistance anytime, anywhere. No appointments needed - just ask your questions when you need answers.</p>
+        </div>
+
+        <div class="feature-card" onclick="window.location.href='/chat'">
+            <div class="feature-icon">
+                <i class="fas fa-shield-alt"></i>
+            </div>
+            <h3>Privacy & Security</h3>
+            <p>Your health information is completely private and secure. We follow strict medical privacy standards.</p>
+        </div>
+
+        <div class="feature-card" onclick="window.location.href='/chat'">
+            <div class="feature-icon">
+                <i class="fas fa-brain"></i>
+            </div>
+            <h3>AI-Powered Analysis</h3>
+            <p>Advanced artificial intelligence analyzes your symptoms and provides comprehensive health insights.</p>
+        </div>
+
+        <div class="feature-card" onclick="window.location.href='/gradio'">
+            <div class="feature-icon">
+                <i class="fas fa-laptop-medical"></i>
+            </div>
+            <h3>Multiple Interfaces</h3>
+            <p>Choose between our custom chat interface or the advanced Gradio-powered AI interface for different experiences.</p>
+        </div>
+
+        <div class="feature-card" onclick="window.location.href='/chat'">
+            <div class="feature-icon">
+                <i class="fas fa-pills"></i>
+            </div>
+            <h3>Medication Information</h3>
+            <p>Get detailed information about medications, dosages, side effects, and drug interactions.</p>
+        </div>
+    </div>
+
+    <div class="info-section" style="background: rgba(255, 255, 255, 0.1); padding: 3rem; border-radius: 20px; margin: 3rem 0; text-align: center; color: white;">
+        <h2 style="margin-bottom: 2rem; font-size: 2.5rem;">
+            <i class="fas fa-exclamation-triangle" style="color: #ffd700; margin-right: 0.5rem;"></i>
+            Important Medical Disclaimer
+        </h2>
+        <div style="max-width: 800px; margin: 0 auto; font-size: 1.1rem; line-height: 1.8;">
+            <p style="margin-bottom: 1.5rem;">
+                <strong>This AI medical assistant is designed to provide general health information and guidance for educational purposes only.</strong>
+            </p>
+            <p style="margin-bottom: 1.5rem;">
+                It should <strong>NOT</strong> be used as a substitute for professional medical advice, diagnosis, or treatment. Always consult with a qualified healthcare provider for medical concerns.
+            </p>
+            <p style="margin-bottom: 1.5rem;">
+                <strong>In case of medical emergencies, call your local emergency services immediately.</strong>
+            </p>
+            <div style="margin-top: 2rem;">
+                <a href="tel:911" class="btn btn-primary" style="background: linear-gradient(45deg, #ff6b6b, #ff8e8e); margin-right: 1rem;">
+                    <i class="fas fa-phone"></i>
+                    Emergency: 911
+                </a>
+                <a href="/chat" class="btn btn-secondary">
+                    <i class="fas fa-comments"></i>
+                    Start Non-Emergency Chat
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <div class="stats-section" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 2rem; margin: 3rem 0;">
+        <div style="text-align: center; color: white;">
+            <div style="font-size: 3rem; font-weight: bold; color: #4facfe;">24/7</div>
+            <div style="font-size: 1.2rem; opacity: 0.9;">Available</div>
+        </div>
+        <div style="text-align: center; color: white;">
+            <div style="font-size: 3rem; font-weight: bold; color: #4facfe;">AI</div>
+            <div style="font-size: 1.2rem; opacity: 0.9;">Powered</div>
+        </div>
+        <div style="text-align: center; color: white;">
+            <div style="font-size: 3rem; font-weight: bold; color: #4facfe;">100%</div>
+            <div style="font-size: 1.2rem; opacity: 0.9;">Private</div>
+        </div>
+        <div style="text-align: center; color: white;">
+            <div style="font-size: 3rem; font-weight: bold; color: #4facfe;">Free</div>
+            <div style="font-size: 1.2rem; opacity: 0.9;">To Use</div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+// Add some interactive animations
+document.addEventListener('DOMContentLoaded', function() {
+    // Animate feature cards on scroll
+    const cards = document.querySelectorAll('.feature-card');
+    
+    const observerOptions = {
+        threshold: 0.1,
+        rootMargin: '0px 0px -50px 0px'
+    };
+    
+    const observer = new IntersectionObserver(function(entries) {
+        entries.forEach(entry => {
+            if (entry.isIntersecting) {
+                entry.target.style.opacity = '1';
+                entry.target.style.transform = 'translateY(0)';
+            }
+        });
+    }, observerOptions);
+    
+    cards.forEach((card, index) => {
+        card.style.opacity = '0';
+        card.style.transform = 'translateY(50px)';
+        card.style.transition = `opacity 0.6s ease ${index * 0.1}s, transform 0.6s ease ${index * 0.1}s`;
+        observer.observe(card);
+    });
+});
+{% endblock %}
