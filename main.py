@@ -544,6 +544,79 @@ def api_clear_chat_history():
         print(f"Clear chat history error: {e}")
         return jsonify({'success': False, 'error': str(e)}), 500
 
+# New conversation management API endpoints
+@app.route('/api/conversations', methods=['GET'])
+@login_required
+def api_get_conversations():
+    """Get user's conversations"""
+    try:
+        conversations = auth_db.get_user_conversations(request.user['id'])
+        return jsonify({
+            'success': True,
+            'conversations': conversations
+        })
+    except Exception as e:
+        print(f"Get conversations error: {e}")
+        return jsonify({'error': 'Failed to retrieve conversations'}), 500
+
+@app.route('/api/conversation/<conversation_id>/messages', methods=['GET'])
+@login_required
+def api_get_conversation_messages(conversation_id):
+    """Get messages in a specific conversation"""
+    try:
+        messages = auth_db.get_conversation_messages(conversation_id, request.user['id'])
+        return jsonify({
+            'success': True,
+            'messages': messages,
+            'conversation_id': conversation_id
+        })
+    except Exception as e:
+        print(f"Get conversation messages error: {e}")
+        return jsonify({'error': 'Failed to retrieve conversation messages'}), 500
+
+@app.route('/api/conversation/<conversation_id>', methods=['DELETE'])
+@login_required
+def api_delete_conversation(conversation_id):
+    """Delete a specific conversation"""
+    try:
+        success = auth_db.delete_conversation(conversation_id, request.user['id'])
+        if success:
+            return jsonify({
+                'success': True,
+                'message': 'Conversation deleted successfully'
+            })
+        else:
+            return jsonify({'error': 'Failed to delete conversation'}), 500
+            
+    except Exception as e:
+        print(f"Delete conversation error: {e}")
+        return jsonify({'error': 'Failed to delete conversation'}), 500
+
+# Updated clear all chats to use the new method
+@app.route('/api/chat-history/clear-all', methods=['DELETE'])
+@login_required
+def api_clear_all_chats():
+    """Clear all chat history for the current user - Enhanced version"""
+    try:
+        user_id = request.user['id']
+        
+        # Use the new clear method
+        deleted_count = auth_db.clear_all_user_chats(user_id)
+        
+        # Clear from memory conversation
+        if user_id in user_conversations:
+            del user_conversations[user_id]
+        
+        return jsonify({
+            'success': True, 
+            'message': f'Deleted {deleted_count} chat messages',
+            'deleted_count': deleted_count
+        })
+        
+    except Exception as e:
+        print(f"Clear all chats error: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
 def run_gradio():
     """Run Gradio in a separate thread"""
     if gradio_available:

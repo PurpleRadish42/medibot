@@ -1009,19 +1009,35 @@
                     // For database chats, we need to reconstruct the chat object
                     const title = chatElement.querySelector('.chat-item-title').textContent;
                     
-                    // For now, create a minimal chat object - in real implementation,
-                    // you might want to store full chat data or reload from database
-                    chat = {
-                        id: chatId,
-                        title: title,
-                        messages: [], // Will be populated from the individual database entries
-                        date: new Date().toISOString(),
-                        source: 'database'
-                    };
+                    // Load conversation messages from database
+                    console.log("📄 Loading database chat session:", chatId);
                     
-                    console.log("📄 Loading database chat session (simplified)");
-                    showStatus("Database chat loading not fully implemented yet", "error");
-                    return;
+                    try {
+                        const response = await fetch(`/api/conversation/${chatId}/messages`);
+                        if (!response.ok) {
+                            throw new Error(`Failed to load conversation: ${response.status}`);
+                        }
+                        
+                        const data = await response.json();
+                        if (!data.success) {
+                            throw new Error(data.error || 'Failed to load conversation');
+                        }
+                        
+                        chat = {
+                            id: chatId,
+                            title: title,
+                            messages: data.messages || [],
+                            date: new Date().toISOString(),
+                            source: 'database'
+                        };
+                        
+                        console.log(`✅ Loaded conversation ${chatId} with ${chat.messages.length} messages`);
+                        
+                    } catch (error) {
+                        console.error("❌ Failed to load database conversation:", error);
+                        showStatus("Failed to load conversation from database", "error");
+                        return;
+                    }
                 }
             }
             
@@ -1125,54 +1141,97 @@
         }
 
         // Clear all chats
-        function clearAllChats() {
+        async function clearAllChats() {
             if (!confirm("Are you sure you want to clear all chat history?")) {
                 return;
             }
             
-            // Clear localStorage
-            localStorage.removeItem('medbot_chats');
-            
-            // Clear sidebar
-            const chatHistoryContainer = document.getElementById('chatHistory');
-            chatHistoryContainer.innerHTML = '';
-            
-            // Start new chat
-            startNewChat();
-            
-            showStatus("All chats cleared", "success");
-            console.log('All chats cleared');
+            try {
+                showStatus("Clearing all chats...", "info");
+                
+                // Call backend API to clear database
+                const response = await fetch('/api/chat-history/clear-all', {
+                    method: 'DELETE',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    }
+                });
+                
+                if (!response.ok) {
+                    throw new Error(`Failed to clear chats: ${response.status}`);
+                }
+                
+                const data = await response.json();
+                if (!data.success) {
+                    throw new Error(data.error || 'Failed to clear chats');
+                }
+                
+                // Clear localStorage
+                localStorage.removeItem('medbot_chats');
+                
+                // Clear sidebar
+                const chatHistoryContainer = document.getElementById('chatHistory');
+                chatHistoryContainer.innerHTML = '';
+                
+                // Start new chat
+                startNewChat();
+                
+                showStatus(`All chats cleared (${data.deleted_count} messages deleted)`, "success");
+                console.log(`All chats cleared: ${data.deleted_count} messages deleted`);
+                
+            } catch (error) {
+                console.error("❌ Failed to clear all chats:", error);
+                showStatus("Failed to clear all chats", "error");
+            }
         }
 
         // Load chat history from database
         async function loadDatabaseChatHistory() {
             try {
-                console.log("📖 Loading chat history from database...");
+                console.log("📖 Loading conversations from database...");
                 
-                const response = await fetch('/api/chat-history?limit=50');
+                const response = await fetch('/api/conversations');
                 if (!response.ok) {
-                    console.warn("❌ Failed to load chat history from database:", response.status);
+                    console.warn("❌ Failed to load conversations from database:", response.status);
                     return;
                 }
                 
                 const data = await response.json();
                 if (!data.success) {
-                    console.warn("❌ Chat history API returned error:", data.error);
+                    console.warn("❌ Conversations API returned error:", data.error);
                     return;
                 }
                 
-                console.log(`✅ Loaded ${data.history.length} chat entries from database`);
+                console.log(`✅ Loaded ${data.conversations.length} conversations from database`);
                 
-                // Convert database format to chat sessions for sidebar
-                const chatSessions = convertDatabaseToChatSessions(data.history);
+                // Convert conversations to chat sessions for sidebar
+                const chatSessions = convertConversationsToChatSessions(data.conversations);
                 console.log(`📋 Converted to ${chatSessions.length} chat sessions`);
                 
                 // Display in sidebar
                 displayChatSessions(chatSessions);
                 
             } catch (error) {
-                console.error("❌ Error loading database chat history:", error);
+                console.error("❌ Error loading database conversations:", error);
             }
+        }
+        
+        // Convert conversations API format to chat sessions
+        function convertConversationsToChatSessions(conversations) {
+            const sessions = [];
+            
+            for (const conv of conversations) {
+                sessions.push({
+                    id: conv.id,
+                    title: conv.title,
+                    messages: [], // Will be loaded when clicked
+                    date: conv.last_message,
+                    source: 'database',
+                    messageCount: conv.message_count
+                });
+            }
+            
+            return sessions;
         }
         
         // Convert database format to chat sessions
