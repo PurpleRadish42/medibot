@@ -1,86 +1,45 @@
-import pymysql
+import sqlite3
 import hashlib
 import secrets
 from datetime import datetime, timedelta
 from pathlib import Path
 import re
 import os
-from config import DatabaseConfig
 
 class AuthDatabase:
-    def __init__(self, mysql_config=None):
-        """Initialize MySQL database connection"""
-        self.mysql_config = mysql_config or DatabaseConfig.get_mysql_config()
+    def __init__(self, db_path=None):
+        """Initialize SQLite database connection"""
+        self.db_path = db_path or Path(__file__).parent / "users.db"
         self.init_database()
     
     def init_database(self):
         """Initialize the database with users table"""
-        conn = pymysql.connect(**self.mysql_config)
-        cursor = conn.cursor()
-        
-        # Create database if it doesn't exist
-        cursor.execute(f"CREATE DATABASE IF NOT EXISTS {self.mysql_config['database']}")
-        cursor.execute(f"USE {self.mysql_config['database']}")
-        
-        # Create users table
-        cursor.execute('''
-            CREATE TABLE IF NOT EXISTS users (
-                id INT AUTO_INCREMENT PRIMARY KEY,
-                username VARCHAR(255) UNIQUE NOT NULL,
-                email VARCHAR(255) UNIQUE NOT NULL,
-                password_hash VARCHAR(512) NOT NULL,
-                salt VARCHAR(64) NOT NULL,
-                full_name VARCHAR(255) NOT NULL,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                last_login TIMESTAMP NULL,
-                is_active BOOLEAN DEFAULT 1,
-                failed_login_attempts INT DEFAULT 0,
-                locked_until TIMESTAMP NULL,
-                INDEX idx_username (username),
-                INDEX idx_email (email)
-            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
-        ''')
-        
-        # Create sessions table for session management
-        cursor.execute('''
-            CREATE TABLE IF NOT EXISTS user_sessions (
-                id INT AUTO_INCREMENT PRIMARY KEY,
-                user_id INT NOT NULL,
-                session_token VARCHAR(255) UNIQUE NOT NULL,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                expires_at TIMESTAMP NOT NULL,
-                is_active BOOLEAN DEFAULT 1,
-                FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE,
-                INDEX idx_session_token (session_token),
-                INDEX idx_user_id (user_id)
-            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
-        ''')
-        
-        # Create chat history table
-        cursor.execute('''
-            CREATE TABLE IF NOT EXISTS chat_history (
-                id INT AUTO_INCREMENT PRIMARY KEY,
-                user_id INT NOT NULL,
-                message TEXT NOT NULL,
-                response TEXT NOT NULL,
-                timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE,
-                INDEX idx_user_id_timestamp (user_id, timestamp)
-            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
-        ''')
-        
-        conn.commit()
-        conn.close()
-        print("MySQL database initialized successfully")
+        # SQLite database already exists, just ensure it has the right structure
+        try:
+            conn = self.get_connection()
+            cursor = conn.cursor()
+            
+            # Check if new columns exist, add them if needed
+            cursor.execute("PRAGMA table_info(chat_history)")
+            columns = cursor.fetchall()
+            column_names = [col[1] for col in columns]
+            
+            if 'conversation_id' not in column_names:
+                cursor.execute("ALTER TABLE chat_history ADD COLUMN conversation_id TEXT")
+            if 'message_type' not in column_names:
+                cursor.execute("ALTER TABLE chat_history ADD COLUMN message_type TEXT DEFAULT 'user'")
+            if 'title' not in column_names:
+                cursor.execute("ALTER TABLE chat_history ADD COLUMN title TEXT")
+            
+            conn.commit()
+            conn.close()
+            print("SQLite database initialized successfully")
+        except Exception as e:
+            print(f"Database initialization warning: {e}")
     
     def get_connection(self):
-        """Get a MySQL database connection"""
-        conn = pymysql.connect(**self.mysql_config)
-        # Select the database
-        cursor = conn.cursor()
-        cursor.execute(f"USE {self.mysql_config['database']}")
-        cursor.close()
-        return conn
+        """Get a SQLite database connection"""
+        return sqlite3.connect(self.db_path)
     
     def hash_password(self, password):
         """Hash password with salt"""
@@ -130,7 +89,7 @@ class AuthDatabase:
             cursor = conn.cursor()
             
             # Check if username or email already exists
-            cursor.execute('SELECT id FROM users WHERE username = %s OR email = %s', 
+            cursor.execute('SELECT id FROM users WHERE username = ? OR email = ?', 
                           (username, email))
             if cursor.fetchone():
                 conn.close()
@@ -140,10 +99,10 @@ class AuthDatabase:
             password_hash, salt = self.hash_password(password)
             
             # Insert new user
-            cursor.execute('''
+            cursor.execute("""
                 INSERT INTO users (username, email, password_hash, salt, full_name)
-                VALUES (%s, %s, %s, %s, %s)
-            ''', (username, email, password_hash, salt, full_name))
+                VALUES (?, ?, ?, ?, ?)
+            """, (username, email, password_hash, salt, full_name))
             
             conn.commit()
             user_id = cursor.lastrowid
@@ -152,7 +111,7 @@ class AuthDatabase:
             print(f"User {username} registered successfully with ID {user_id}")
             return True, f"User {username} registered successfully"
             
-        except pymysql.Error as e:
+        except sqlite3.Error as e:
             print(f"Database error during registration: {str(e)}")
             return False, f"Database error: {str(e)}"
         except Exception as e:
@@ -166,12 +125,12 @@ class AuthDatabase:
             cursor = conn.cursor()
             
             # Get user by username or email
-            cursor.execute('''
+            cursor.execute("""
                 SELECT id, username, email, password_hash, salt, full_name, 
                        failed_login_attempts, locked_until, is_active
                 FROM users 
-                WHERE (username = %s OR email = %s) AND is_active = 1
-            ''', (username_or_email, username_or_email))
+                WHERE (username = ? OR email = ?) AND is_active = 1
+            """, (username_or_email, username_or_email))
             
             user = cursor.fetchone()
             if not user:
@@ -187,7 +146,7 @@ class AuthDatabase:
                     return False, f"Account locked until {locked_until.strftime('%Y-%m-%d %H:%M:%S')}", None
                 else:
                     # Clear the lock since it's expired
-                    cursor.execute('UPDATE users SET locked_until = NULL WHERE id = %s', (user_id,))
+                    cursor.execute('UPDATE users SET locked_until = NULL WHERE id = ?', (user_id,))
                     conn.commit()
             
             # Verify password
@@ -197,31 +156,31 @@ class AuthDatabase:
                 if failed_attempts >= 5:
                     # Lock account for 30 minutes
                     lock_until = datetime.now() + timedelta(minutes=30)
-                    cursor.execute('''
+                    cursor.execute("""
                         UPDATE users 
-                        SET failed_login_attempts = %s, locked_until = %s
-                        WHERE id = %s
-                    ''', (failed_attempts, lock_until, user_id))
+                        SET failed_login_attempts = ?, locked_until = ?
+                        WHERE id = ?
+                    """, (failed_attempts, lock_until, user_id))
                     conn.commit()
                     conn.close()
                     return False, "Too many failed attempts. Account locked for 30 minutes.", None
                 else:
-                    cursor.execute('''
+                    cursor.execute("""
                         UPDATE users 
-                        SET failed_login_attempts = %s
-                        WHERE id = %s
-                    ''', (failed_attempts, user_id))
+                        SET failed_login_attempts = ?
+                        WHERE id = ?
+                    """, (failed_attempts, user_id))
                     conn.commit()
                 
                 conn.close()
                 return False, "Invalid username/email or password", None
             
             # Reset failed attempts and update last login
-            cursor.execute('''
+            cursor.execute("""
                 UPDATE users 
-                SET failed_login_attempts = 0, locked_until = NULL, last_login = CURRENT_TIMESTAMP
-                WHERE id = %s
-            ''', (user_id,))
+                SET failed_login_attempts = 0, locked_until = NULL, last_login = datetime('now')
+                WHERE id = ?
+            """, (user_id,))
             
             conn.commit()
             conn.close()
@@ -343,20 +302,11 @@ class AuthDatabase:
             return False
     
     def save_chat_message(self, user_id, message, response):
-        """Save chat message to history"""
+        """Save chat message to history - updated to use conversation support"""
         try:
-            conn = self.get_connection()
-            cursor = conn.cursor()
-            
-            cursor.execute('''
-                INSERT INTO chat_history (user_id, message, response)
-                VALUES (%s, %s, %s)
-            ''', (user_id, message, response))
-            
-            conn.commit()
-            conn.close()
-            print(f"Chat message saved for user ID {user_id}")
-            return True
+            # Use the new conversation-aware method
+            conversation_id = self.save_chat_message_with_conversation(user_id, message, response)
+            return conversation_id is not None
             
         except Exception as e:
             print(f"Chat save error: {e}")
@@ -462,6 +412,153 @@ class AuthDatabase:
         except Exception as e:
             print(f"Data deletion error: {e}")
             return False
+
+    def save_chat_message_with_conversation(self, user_id, message, response, conversation_id=None):
+        """Save chat message to history with conversation support"""
+        try:
+            conn = self.get_connection()
+            cursor = conn.cursor()
+            
+            # If no conversation_id provided, create a new one
+            if not conversation_id:
+                import uuid
+                conversation_id = f"conv_{user_id}_{uuid.uuid4().hex[:8]}"
+                
+                # Generate title from message
+                title = message[:50] + "..." if len(message) > 50 else message
+            else:
+                # Get existing title
+                cursor.execute("SELECT title FROM chat_history WHERE conversation_id = ? LIMIT 1", (conversation_id,))
+                result = cursor.fetchone()
+                title = result[0] if result else message[:50]
+            
+            # Save the conversation entry (combining user message and bot response in one record)
+            cursor.execute("""
+                INSERT INTO chat_history (user_id, conversation_id, message_type, title, message, response, timestamp)
+                VALUES (?, ?, 'user', ?, ?, ?, datetime('now'))
+            """, (user_id, conversation_id, title, message, response))
+            
+            conn.commit()
+            conn.close()
+            print(f"Chat message saved with conversation {conversation_id} for user ID {user_id}")
+            return conversation_id
+            
+        except Exception as e:
+            print(f"Chat save error: {e}")
+            return None
+
+    def get_user_conversations(self, user_id):
+        """Get all conversations for a user"""
+        try:
+            conn = self.get_connection()
+            cursor = conn.cursor()
+            
+            cursor.execute("""
+                SELECT conversation_id, title, 
+                       MIN(timestamp) as first_message,
+                       MAX(timestamp) as last_message,
+                       COUNT(*) as message_count
+                FROM chat_history
+                WHERE user_id = ? AND conversation_id IS NOT NULL AND conversation_id != ''
+                GROUP BY conversation_id, title
+                ORDER BY last_message DESC
+            """, (user_id,))
+            
+            conversations = cursor.fetchall()
+            conn.close()
+            
+            formatted_conversations = []
+            for conv_id, title, first_msg, last_msg, msg_count in conversations:
+                formatted_conversations.append({
+                    'id': conv_id,
+                    'title': title,
+                    'first_message': first_msg,
+                    'last_message': last_msg,
+                    'message_count': msg_count
+                })
+            
+            print(f"Retrieved {len(formatted_conversations)} conversations for user {user_id}")
+            return formatted_conversations
+            
+        except Exception as e:
+            print(f"Get conversations error: {e}")
+            return []
+
+    def get_conversation_messages(self, conversation_id, user_id):
+        """Get all messages in a specific conversation"""
+        try:
+            conn = self.get_connection()
+            cursor = conn.cursor()
+            
+            cursor.execute("""
+                SELECT message, response, timestamp, message_type
+                FROM chat_history
+                WHERE conversation_id = ? AND user_id = ?
+                ORDER BY timestamp ASC
+            """, (conversation_id, user_id))
+            
+            messages = cursor.fetchall()
+            conn.close()
+            
+            formatted_messages = []
+            for message, response, timestamp, msg_type in messages:
+                if message and message.strip():
+                    formatted_messages.append({
+                        'content': message,
+                        'isUser': True,
+                        'timestamp': timestamp
+                    })
+                if response and response.strip():
+                    formatted_messages.append({
+                        'content': response,
+                        'isUser': False,
+                        'timestamp': timestamp
+                    })
+            
+            print(f"Retrieved {len(formatted_messages)} messages for conversation {conversation_id}")
+            return formatted_messages
+            
+        except Exception as e:
+            print(f"Get conversation messages error: {e}")
+            return []
+
+    def delete_conversation(self, conversation_id, user_id):
+        """Delete a specific conversation"""
+        try:
+            conn = self.get_connection()
+            cursor = conn.cursor()
+            
+            cursor.execute("DELETE FROM chat_history WHERE conversation_id = ? AND user_id = ?", 
+                          (conversation_id, user_id))
+            
+            deleted_count = cursor.rowcount
+            conn.commit()
+            conn.close()
+            
+            print(f"Deleted conversation {conversation_id}: {deleted_count} messages")
+            return deleted_count > 0
+            
+        except Exception as e:
+            print(f"Delete conversation error: {e}")
+            return False
+
+    def clear_all_user_chats(self, user_id):
+        """Clear all chat history for a user"""
+        try:
+            conn = self.get_connection()
+            cursor = conn.cursor()
+            
+            cursor.execute("DELETE FROM chat_history WHERE user_id = ?", (user_id,))
+            deleted_count = cursor.rowcount
+            conn.commit()
+            conn.close()
+            
+            print(f"Cleared all chats for user {user_id}: {deleted_count} messages deleted")
+            return deleted_count
+            
+        except Exception as e:
+            print(f"Clear chats error: {e}")
+            return 0
     
     def cleanup_expired_sessions(self):
         """Clean up expired sessions (run periodically)"""
