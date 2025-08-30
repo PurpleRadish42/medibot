@@ -984,7 +984,7 @@
             localStorage.setItem('medbot_chats', JSON.stringify(savedChats));
         }
 
-        // FIXED: Load chat session function
+        // FIXED: Load chat session function (supports both localStorage and database chats)
         async function loadChatSession(chatId) {
             console.log("📂 Loading chat session:", chatId);
             
@@ -995,8 +995,35 @@
             
             showStatus("Loading conversation...", "info", 0);
             
+            let chat = null;
+            
+            // Try to find chat in localStorage first
             const savedChats = JSON.parse(localStorage.getItem('medbot_chats') || '[]');
-            const chat = savedChats.find(c => c.id === chatId);
+            chat = savedChats.find(c => c.id === chatId);
+            
+            // If not found in localStorage and it's a database chat, load from converted data
+            if (!chat && chatId.startsWith('db_')) {
+                // Find chat in the DOM to get its data
+                const chatElement = document.querySelector(`[data-chat-id="${chatId}"]`);
+                if (chatElement) {
+                    // For database chats, we need to reconstruct the chat object
+                    const title = chatElement.querySelector('.chat-item-title').textContent;
+                    
+                    // For now, create a minimal chat object - in real implementation,
+                    // you might want to store full chat data or reload from database
+                    chat = {
+                        id: chatId,
+                        title: title,
+                        messages: [], // Will be populated from the individual database entries
+                        date: new Date().toISOString(),
+                        source: 'database'
+                    };
+                    
+                    console.log("📄 Loading database chat session (simplified)");
+                    showStatus("Database chat loading not fully implemented yet", "error");
+                    return;
+                }
+            }
             
             if (!chat) {
                 showStatus("Chat not found", "error");
@@ -1117,7 +1144,113 @@
             console.log('All chats cleared');
         }
 
-        // Load saved chats from localStorage
+        // Load chat history from database
+        async function loadDatabaseChatHistory() {
+            try {
+                console.log("📖 Loading chat history from database...");
+                
+                const response = await fetch('/api/chat-history?limit=50');
+                if (!response.ok) {
+                    console.warn("❌ Failed to load chat history from database:", response.status);
+                    return;
+                }
+                
+                const data = await response.json();
+                if (!data.success) {
+                    console.warn("❌ Chat history API returned error:", data.error);
+                    return;
+                }
+                
+                console.log(`✅ Loaded ${data.history.length} chat entries from database`);
+                
+                // Convert database format to chat sessions for sidebar
+                const chatSessions = convertDatabaseToChatSessions(data.history);
+                console.log(`📋 Converted to ${chatSessions.length} chat sessions`);
+                
+                // Display in sidebar
+                displayChatSessions(chatSessions);
+                
+            } catch (error) {
+                console.error("❌ Error loading database chat history:", error);
+            }
+        }
+        
+        // Convert database format to chat sessions
+        function convertDatabaseToChatSessions(dbHistory) {
+            const sessions = [];
+            let currentSession = null;
+            let sessionId = 1;
+            
+            // Group consecutive messages into sessions (simple approach)
+            // Each DB entry has {message, response, timestamp}
+            for (let i = 0; i < dbHistory.length; i++) {
+                const entry = dbHistory[i];
+                
+                // Create a new session for each database entry
+                // Each entry represents one user message + one bot response
+                const sessionMessages = [
+                    {
+                        content: entry.message,
+                        isUser: true,
+                        timestamp: entry.timestamp
+                    },
+                    {
+                        content: entry.response,
+                        isUser: false,
+                        timestamp: entry.timestamp
+                    }
+                ];
+                
+                // Generate title from user message
+                const title = entry.message.length > 30 
+                    ? entry.message.substring(0, 30) + '...'
+                    : entry.message;
+                
+                sessions.push({
+                    id: `db_${sessionId++}_${new Date(entry.timestamp).getTime()}`,
+                    title: title,
+                    messages: sessionMessages,
+                    date: entry.timestamp,
+                    source: 'database'
+                });
+            }
+            
+            // Sort by timestamp (newest first)
+            sessions.sort((a, b) => new Date(b.date) - new Date(a.date));
+            
+            return sessions;
+        }
+        
+        // Display chat sessions in sidebar
+        function displayChatSessions(chatSessions) {
+            const chatHistoryContainer = document.getElementById('chatHistory');
+            
+            chatSessions.forEach(chat => {
+                const chatItem = document.createElement('div');
+                chatItem.className = 'chat-item';
+                chatItem.setAttribute('data-chat-id', chat.id);
+                chatItem.onclick = (e) => {
+                    // Don't load chat if clicking delete button
+                    if (e.target.closest('.delete-chat-btn')) return;
+                    loadChatSession(chat.id);
+                };
+                
+                chatItem.innerHTML = `
+                    <div class="chat-item-header">
+                        <div class="chat-item-title">${chat.title}</div>
+                        <button class="delete-chat-btn" onclick="deleteChatSessionById('${chat.id}', event)" title="Delete chat">
+                            <i class="fas fa-times"></i>
+                        </button>
+                    </div>
+                    <div class="chat-item-preview">${chat.messages.length} messages</div>
+                    <div class="chat-item-date">${new Date(chat.date).toLocaleDateString()}</div>
+                `;
+                
+                chatHistoryContainer.appendChild(chatItem);
+            });
+        }
+
+        // Load saved chats from localStorage (legacy support)
         function loadSavedChats() {
             const savedChats = JSON.parse(localStorage.getItem('medbot_chats') || '[]');
             const chatHistoryContainer = document.getElementById('chatHistory');
@@ -1214,13 +1347,20 @@
                 sendInProgress: false
             };
             
-            // Load saved chats
-            loadSavedChats();
-            
-            // Check API status
+            // Check API status first
             const apiStatus = await checkAPIStatus();
             window.ChatState.isServerReady = apiStatus;
             console.log("📡 API Status:", apiStatus ? "✅ Online" : "❌ Offline");
+            
+            // Load chat history from database (primary source)
+            if (apiStatus) {
+                await loadDatabaseChatHistory();
+            } else {
+                console.warn("⚠ API offline, loading from localStorage only");
+            }
+            
+            // Load any remaining chats from localStorage (fallback/legacy)
+            loadSavedChats();
             
             // Focus on input
             document.getElementById('messageInput').focus();
@@ -1234,6 +1374,7 @@
                     debugState();
                     testAPI();
                 };
+                debugBtn.style.cssText = 'position: fixed; top: 10px; right: 10px; z-index: 9999; background: #4facfe; color: white; border: none; padding: 10px; border-radius: 5px; cursor: pointer;';
                 document.body.appendChild(debugBtn);
                 
                 console.log("🔧 Debug mode enabled (localhost)");
