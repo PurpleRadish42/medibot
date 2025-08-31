@@ -491,6 +491,58 @@
         .chat-history::-webkit-scrollbar-thumb:hover {
             background: rgba(255, 255, 255, 0.5);
         }
+
+        /* Doctor recommendation table styles */
+        .message.bot table {
+            font-size: 0.9rem;
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+
+        .message.bot table th {
+            font-size: 0.85rem;
+            padding: 8px 6px !important;
+            white-space: nowrap;
+        }
+
+        .message.bot table td {
+            padding: 8px 6px !important;
+            font-size: 0.8rem;
+            vertical-align: top;
+        }
+
+        .message.bot table a {
+            color: #4facfe !important;
+            text-decoration: none;
+            font-weight: 500;
+        }
+
+        .message.bot table a:hover {
+            text-decoration: underline;
+        }
+
+        /* Responsive table for mobile */
+        @media (max-width: 768px) {
+            .message.bot table {
+                font-size: 0.75rem;
+                display: block;
+                overflow-x: auto;
+                white-space: nowrap;
+            }
+            
+            .message.bot table th,
+            .message.bot table td {
+                padding: 6px 4px !important;
+                font-size: 0.7rem;
+            }
+        }
+
+        /* Important notes box styling within chat */
+        .message.bot div[style*="background: linear-gradient"] {
+            border-left: 4px solid #4facfe !important;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
     </style>
 </head>
 <body>
@@ -662,7 +714,12 @@
             messageContent.className = 'message-content';
             
             const messageText = document.createElement('div');
-            messageText.textContent = content;
+            // Use innerHTML for bot messages (to display HTML tables), textContent for user messages (for security)
+            if (isUser) {
+                messageText.textContent = content;
+            } else {
+                messageText.innerHTML = content;
+            }
             
             const messageTime = document.createElement('div');
             messageTime.className = 'message-time';
@@ -707,7 +764,12 @@
             messageContent.className = 'message-content';
             
             const messageText = document.createElement('div');
-            messageText.textContent = content;
+            // Use innerHTML for bot messages (to display HTML tables), textContent for user messages (for security)
+            if (isUser) {
+                messageText.textContent = content;
+            } else {
+                messageText.innerHTML = content;
+            }
             
             const messageTime = document.createElement('div');
             messageTime.className = 'message-time';
