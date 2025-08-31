@@ -395,6 +395,67 @@
             transform: none;
         }
 
+        .mic-button {
+            width: 50px;
+            height: 50px;
+            border: none;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #f59e0b 0%, #f97316 100%);
+            color: white;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.3s ease;
+            font-size: 1.2rem;
+            margin-right: 0.5rem;
+        }
+
+        .mic-button:hover:not(:disabled) {
+            transform: scale(1.05);
+            box-shadow: 0 5px 15px rgba(245, 158, 11, 0.4);
+        }
+
+        .mic-button.recording {
+            background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+            animation: pulse 1.5s infinite;
+        }
+
+        .mic-button.recording i:before {
+            content: "\f04d"; /* FontAwesome stop icon */
+        }
+
+        @keyframes pulse {
+            0% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7); }
+            70% { box-shadow: 0 0 0 10px rgba(239, 68, 68, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
+        }
+
+        .speech-status {
+            position: absolute;
+            bottom: 100%;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0, 0, 0, 0.8);
+            color: white;
+            padding: 0.5rem 1rem;
+            border-radius: 20px;
+            margin-bottom: 0.5rem;
+            font-size: 0.9rem;
+            z-index: 1000;
+            white-space: nowrap;
+        }
+
+        .speech-status-content {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .input-wrapper {
+            position: relative;
+        }
+
         .welcome-message {
             text-align: center;
             color: white;
@@ -637,9 +698,20 @@
                         onkeydown="handleKeyPress(event)"
                         oninput="autoResize(this)"
                     ></textarea>
+                    <button class="mic-button" id="micButton" onclick="toggleSpeechRecognition()" title="Voice Input">
+                        <i class="fas fa-microphone"></i>
+                    </button>
                     <button class="send-button" id="sendButton" onclick="sendMessage()" title="Send Message">
                         <i class="fas fa-paper-plane"></i>
                     </button>
+                </div>
+                
+                <!-- Speech recognition status indicator -->
+                <div class="speech-status" id="speechStatus" style="display: none;">
+                    <div class="speech-status-content">
+                        <i class="fas fa-microphone-alt"></i>
+                        <span id="speechStatusText">🎙️ Listening...</span>
+                    </div>
                 </div>
             </div>
         </div>
@@ -1512,6 +1584,144 @@
             
             console.log("✅ Chat application initialized");
             console.log("📊 Initial state:", JSON.stringify(window.ChatState));
+        });
+
+        // Speech Recognition Implementation
+        let speechRecognition = null;
+        let isListening = false;
+
+        // Initialize speech recognition
+        function initSpeechRecognition() {
+            if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
+                speechRecognition = new (window.SpeechRecognition || window.webkitSpeechRecognition)();
+                speechRecognition.lang = 'en-IN';
+                speechRecognition.interimResults = false;
+                speechRecognition.maxAlternatives = 1;
+                speechRecognition.continuous = false;
+
+                speechRecognition.onstart = function() {
+                    console.log('Speech recognition started');
+                    isListening = true;
+                    updateMicButtonState(true);
+                    showSpeechStatus('🎙️ Listening...');
+                };
+
+                speechRecognition.onresult = function(event) {
+                    console.log('Speech recognition result received');
+                    const transcript = event.results[0][0].transcript;
+                    console.log('Transcript:', transcript);
+                    
+                    const messageInput = document.getElementById('messageInput');
+                    messageInput.value = transcript;
+                    autoResize(messageInput);
+                    messageInput.focus();
+                    
+                    showSpeechStatus('✅ Speech converted');
+                    setTimeout(hideSpeechStatus, 1500);
+                };
+
+                speechRecognition.onerror = function(event) {
+                    console.error('Speech recognition error:', event.error);
+                    let errorMessage = '❌ Speech recognition error';
+                    
+                    switch(event.error) {
+                        case 'no-speech':
+                            errorMessage = '❌ No speech detected';
+                            break;
+                        case 'audio-capture':
+                            errorMessage = '❌ Microphone not accessible';
+                            break;
+                        case 'not-allowed':
+                            errorMessage = '❌ Microphone permission denied';
+                            break;
+                        case 'network':
+                            errorMessage = '❌ Network error';
+                            break;
+                    }
+                    
+                    showSpeechStatus(errorMessage);
+                    setTimeout(hideSpeechStatus, 3000);
+                    stopSpeechRecognition();
+                };
+
+                speechRecognition.onend = function() {
+                    console.log('Speech recognition ended');
+                    stopSpeechRecognition();
+                };
+
+                return true;
+            } else {
+                console.error('Speech recognition not supported');
+                showStatus('Speech recognition not supported in this browser', 'error', 5000);
+                return false;
+            }
+        }
+
+        function toggleSpeechRecognition() {
+            if (!speechRecognition) {
+                if (!initSpeechRecognition()) {
+                    return;
+                }
+            }
+
+            if (!isListening) {
+                try {
+                    speechRecognition.start();
+                } catch (error) {
+                    console.error('Error starting speech recognition:', error);
+                    showSpeechStatus('❌ Failed to start recording');
+                    setTimeout(hideSpeechStatus, 3000);
+                }
+            } else {
+                speechRecognition.stop();
+            }
+        }
+
+        function stopSpeechRecognition() {
+            isListening = false;
+            updateMicButtonState(false);
+            hideSpeechStatus();
+        }
+
+        function updateMicButtonState(recording) {
+            const micButton = document.getElementById('micButton');
+            const micIcon = micButton.querySelector('i');
+            
+            if (recording) {
+                micButton.classList.add('recording');
+                micIcon.className = 'fas fa-stop';
+                micButton.title = 'Stop Recording';
+            } else {
+                micButton.classList.remove('recording');
+                micIcon.className = 'fas fa-microphone';
+                micButton.title = 'Voice Input';
+            }
+        }
+
+        function showSpeechStatus(message) {
+            const speechStatus = document.getElementById('speechStatus');
+            const speechStatusText = document.getElementById('speechStatusText');
+            speechStatusText.textContent = message;
+            speechStatus.style.display = 'block';
+        }
+
+        function hideSpeechStatus() {
+            const speechStatus = document.getElementById('speechStatus');
+            speechStatus.style.display = 'none';
+        }
+
+        // Initialize speech recognition when page loads
+        document.addEventListener('DOMContentLoaded', function() {
+            // Check for speech recognition support and show a notice if not supported
+            if (!('webkitSpeechRecognition' in window || 'SpeechRecognition' in window)) {
+                console.warn('Speech recognition not supported in this browser');
+                const micButton = document.getElementById('micButton');
+                if (micButton) {
+                    micButton.style.opacity = '0.5';
+                    micButton.title = 'Speech recognition not supported in this browser';
+                    micButton.disabled = true;
+                }
+            }
         });
     </script>
 </body>
