@@ -26,7 +26,7 @@ from flask import Flask, render_template, request, jsonify, redirect, url_for, s
 import gradio as gr
 
 # Import authentication database
-from auth import AuthDatabase
+from medibot2_auth import MedibotAuthDatabase
 
 # Import your medical recommender directly with doctor integration
 medical_recommender = None
@@ -61,7 +61,7 @@ app = Flask(__name__)
 app.secret_key = os.getenv('SECRET_KEY', 'your-secret-key-change-this-in-production')
 
 # Initialize authentication database
-auth_db = AuthDatabase()
+auth_db = MedibotAuthDatabase()
 
 # Store conversation histories for each user
 user_conversations = {}
@@ -328,7 +328,9 @@ def api_chat():
         
         # Save chat to database
         try:
-            auth_db.save_chat_message(user_id, message, response)
+            # Get session token for saving chat with conversation tracking
+            session_token = request.cookies.get('session_token')
+            auth_db.save_chat_message(user_id, message, response, session_token=session_token)
             print("💾 Chat saved to database")
         except Exception as e:
             print(f"⚠ Failed to save chat to database: {e}")
@@ -522,13 +524,8 @@ def api_clear_chat_history():
     try:
         user_id = request.user['id']
         
-        # Clear from database
-        conn = auth_db.get_connection()
-        cursor = conn.cursor()
-        cursor.execute('DELETE FROM chat_history WHERE user_id = %s', (user_id,))
-        deleted_count = cursor.rowcount
-        conn.commit()
-        conn.close()
+        # Clear from database using the new method
+        deleted_count = auth_db.clear_all_user_chats(user_id)
         
         # Clear from memory conversation
         if user_id in user_conversations:
@@ -747,10 +744,11 @@ def check_doctor_database():
 
 if __name__ == '__main__':
     print("=" * 70)
-    print("🏥 STARTING MEDICAL CHATBOT WITH DOCTOR RECOMMENDATIONS")
+    print("🏥 STARTING MEDICAL CHATBOT WITH MEDIBOT2 DATABASE")
     print("=" * 70)
     print(f"Project root: {project_root}")
     print(f"Source path: {src_path}")
+    print(f"Database: medibot2 (MySQL)")
     
     # Check OpenAI setup
     openai_ok = check_openai_setup()
@@ -763,17 +761,18 @@ if __name__ == '__main__':
     create_dashboard_template()
     
     # Initialize database
-    print("Initializing authentication database...")
-    auth_db.init_database()
+    print("Initializing medibot2 authentication database...")
+    # The database initialization is handled automatically in MedibotAuthDatabase __init__
     
     # Run Flask app
     print("\n" + "=" * 70)
     print("🚀 FLASK WEB SERVER STARTING")
     print("=" * 70)
     print("✅ Features Available:")
-    print(f"  📱 Authentication System: ✅ Ready")
+    print(f"  📱 Authentication System: ✅ Ready (medibot2 MySQL)")
     print(f"  🤖 Medical AI: {'✅ Ready' if openai_ok else '⚠ Limited'}")
     print(f"  🏥 Doctor Database: {'✅ Ready' if doctor_db_ok else '⚠ Unavailable'}")
+    print(f"  🗄️  Database: medibot2 (MySQL)")
     print("\n🌐 Access URLs:")
     print("  📱 Main app: http://localhost:5000")
     print("  🔐 Login: http://localhost:5000/login")

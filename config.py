@@ -15,7 +15,7 @@ class DatabaseConfig:
         port = os.getenv('MYSQL_PORT', '3306')
         username = os.getenv('MYSQL_USERNAME', 'root')
         password = os.getenv('MYSQL_PASSWORD', '')
-        database = os.getenv('MYSQL_DATABASE', 'medibot')
+        database = os.getenv('MYSQL_DATABASE', 'medibot2')
         
         # URL encode password to handle special characters
         encoded_password = quote_plus(password) if password else ''
@@ -33,7 +33,7 @@ class DatabaseConfig:
             'port': int(os.getenv('MYSQL_PORT', '3306')),
             'user': os.getenv('MYSQL_USERNAME', 'root'),
             'password': os.getenv('MYSQL_PASSWORD', ''),
-            'database': os.getenv('MYSQL_DATABASE', 'medibot'),
+            'database': os.getenv('MYSQL_DATABASE', 'medibot2'),
             'charset': 'utf8mb4',
             'autocommit': False
         }
