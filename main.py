@@ -399,6 +399,62 @@ def api_reset():
             'error': f'Failed to reset conversation: {str(e)}'
         }), 500
 
+# NEW ROUTE: Send doctor recommendations via email
+@app.route('/api/send-email', methods=['POST'])
+@login_required
+def api_send_email():
+    """Send doctor recommendations via email"""
+    try:
+        data = request.get_json()
+        email = data.get('email', '').strip()
+        doctor_html = data.get('doctor_html', '').strip()
+        user_query = data.get('user_query', '').strip()
+        
+        if not email:
+            return jsonify({
+                'success': False,
+                'message': 'Email address is required'
+            }), 400
+            
+        if not doctor_html:
+            return jsonify({
+                'success': False,
+                'message': 'Doctor recommendations data is required'
+            }), 400
+        
+        # Import and use email service
+        from email_service import EmailService
+        email_service = EmailService()
+        
+        # Send email
+        success = email_service.send_doctor_recommendations(
+            to_email=email,
+            doctor_table_html=doctor_html,
+            user_query=user_query
+        )
+        
+        if success:
+            user_id = request.user['id']
+            print(f"✅ Email sent successfully to {email} for user {user_id}")
+            return jsonify({
+                'success': True,
+                'message': f'Doctor recommendations sent successfully to {email}'
+            })
+        else:
+            return jsonify({
+                'success': False,
+                'message': 'Failed to send email. Please check your email address and try again.'
+            }), 500
+            
+    except Exception as e:
+        print(f"❌ Email sending error: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({
+            'success': False,
+            'message': 'An error occurred while sending the email'
+        }), 500
+
 # NEW ROUTE: Update user city for better doctor recommendations
 @app.route('/api/user/city', methods=['POST'])
 @login_required
