@@ -604,6 +604,193 @@
             border-left: 4px solid #4facfe !important;
             box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
         }
+
+        /* Email button styling */
+        .email-button {
+            margin-top: 15px;
+            padding: 12px 24px;
+            background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
+            color: white;
+            border: none;
+            border-radius: 25px;
+            cursor: pointer;
+            font-weight: 600;
+            font-size: 14px;
+            transition: all 0.3s ease;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            box-shadow: 0 2px 8px rgba(40, 167, 69, 0.3);
+        }
+
+        .email-button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 15px rgba(40, 167, 69, 0.4);
+        }
+
+        .email-button:active {
+            transform: translateY(0);
+        }
+
+        /* Email modal styling */
+        .email-modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.5);
+            backdrop-filter: blur(5px);
+        }
+
+        .email-modal-content {
+            background: white;
+            margin: 10% auto;
+            padding: 30px;
+            border-radius: 15px;
+            width: 90%;
+            max-width: 500px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+            position: relative;
+            animation: modalSlideIn 0.3s ease;
+        }
+
+        @keyframes modalSlideIn {
+            from {
+                opacity: 0;
+                transform: translateY(-50px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .modal-header {
+            text-align: center;
+            margin-bottom: 25px;
+        }
+
+        .modal-header h2 {
+            color: #495057;
+            margin: 0 0 10px 0;
+            font-size: 24px;
+        }
+
+        .modal-header p {
+            color: #6c757d;
+            margin: 0;
+            font-size: 16px;
+        }
+
+        .email-input-group {
+            margin-bottom: 20px;
+        }
+
+        .email-input-group label {
+            display: block;
+            margin-bottom: 8px;
+            color: #495057;
+            font-weight: 600;
+        }
+
+        .email-input {
+            width: 100%;
+            padding: 12px 16px;
+            border: 2px solid #dee2e6;
+            border-radius: 8px;
+            font-size: 16px;
+            transition: all 0.3s ease;
+            box-sizing: border-box;
+        }
+
+        .email-input:focus {
+            border-color: #4facfe;
+            outline: none;
+            box-shadow: 0 0 0 3px rgba(79, 172, 254, 0.1);
+        }
+
+        .modal-buttons {
+            display: flex;
+            gap: 15px;
+            justify-content: flex-end;
+            margin-top: 25px;
+        }
+
+        .modal-btn {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .modal-btn-cancel {
+            background: #6c757d;
+            color: white;
+        }
+
+        .modal-btn-cancel:hover {
+            background: #5a6268;
+        }
+
+        .modal-btn-send {
+            background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
+            color: white;
+        }
+
+        .modal-btn-send:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 15px rgba(40, 167, 69, 0.3);
+        }
+
+        .modal-btn-send:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .close-modal {
+            position: absolute;
+            top: 15px;
+            right: 20px;
+            background: none;
+            border: none;
+            font-size: 24px;
+            cursor: pointer;
+            color: #adb5bd;
+            width: 30px;
+            height: 30px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 50%;
+            transition: all 0.3s ease;
+        }
+
+        .close-modal:hover {
+            background: #f8f9fa;
+            color: #495057;
+        }
+
+        /* Loading spinner for send button */
+        .spinner {
+            display: inline-block;
+            width: 16px;
+            height: 16px;
+            border: 2px solid #ffffff;
+            border-radius: 50%;
+            border-top-color: transparent;
+            animation: spin 1s ease-in-out infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
     </style>
 </head>
 <body>
@@ -765,6 +952,114 @@
             return new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
         }
 
+        // Helper function to detect if content contains doctor recommendations
+        function hasDoctorRecommendations(content) {
+            return content.includes('Important Notes:') && content.includes('<table');
+        }
+
+        // Helper function to create email button
+        function createEmailButton(content) {
+            const emailButton = document.createElement('button');
+            emailButton.className = 'email-button';
+            emailButton.innerHTML = '<i class="fas fa-envelope"></i> Send via Email';
+            emailButton.onclick = () => openEmailModal(content);
+            return emailButton;
+        }
+
+        // Email modal functions
+        let currentDoctorContent = '';
+
+        function openEmailModal(doctorContent) {
+            currentDoctorContent = doctorContent;
+            const modal = document.getElementById('emailModal');
+            const emailInput = document.getElementById('emailInput');
+            modal.style.display = 'block';
+            emailInput.focus();
+            
+            // Allow Enter key to send email
+            emailInput.onkeypress = function(e) {
+                if (e.key === 'Enter') {
+                    sendDoctorEmail();
+                }
+            };
+        }
+
+        function closeEmailModal() {
+            const modal = document.getElementById('emailModal');
+            const emailInput = document.getElementById('emailInput');
+            modal.style.display = 'none';
+            emailInput.value = '';
+            currentDoctorContent = '';
+        }
+
+        async function sendDoctorEmail() {
+            const emailInput = document.getElementById('emailInput');
+            const sendBtn = document.getElementById('sendEmailBtn');
+            const email = emailInput.value.trim();
+
+            if (!email) {
+                showStatus('Please enter a valid email address', 'error');
+                emailInput.focus();
+                return;
+            }
+
+            // Email validation
+            const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+            if (!emailRegex.test(email)) {
+                showStatus('Please enter a valid email address', 'error');
+                emailInput.focus();
+                return;
+            }
+
+            // Show loading state
+            sendBtn.disabled = true;
+            sendBtn.innerHTML = '<span class="spinner"></span> Sending...';
+
+            try {
+                const response = await fetch('/api/send-email', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        email: email,
+                        doctor_html: currentDoctorContent,
+                        user_query: getLastUserMessage()
+                    })
+                });
+
+                const data = await response.json();
+
+                if (response.ok && data.success) {
+                    showStatus(`Email sent successfully to ${email}`, 'success');
+                    closeEmailModal();
+                } else {
+                    showStatus(data.message || 'Failed to send email', 'error');
+                }
+            } catch (error) {
+                console.error('Email sending error:', error);
+                showStatus('Failed to send email. Please try again.', 'error');
+            } finally {
+                // Reset button state
+                sendBtn.disabled = false;
+                sendBtn.innerHTML = '<i class="fas fa-paper-plane"></i> Send Email';
+            }
+        }
+
+        function getLastUserMessage() {
+            // Get the last user message from chat history for context
+            const userMessages = window.ChatState.chatHistory.filter(msg => msg.isUser);
+            return userMessages.length > 0 ? userMessages[userMessages.length - 1].content : '';
+        }
+
+        // Close modal when clicking outside
+        window.onclick = function(event) {
+            const modal = document.getElementById('emailModal');
+            if (event.target === modal) {
+                closeEmailModal();
+            }
+        };
+
         // Add message to chat interface
         function addMessage(content, isUser = false) {
             const chatMessages = document.getElementById('chatMessages');
@@ -799,6 +1094,12 @@
             
             messageContent.appendChild(messageText);
             messageContent.appendChild(messageTime);
+            
+            // Add email button for doctor recommendations
+            if (!isUser && hasDoctorRecommendations(content)) {
+                const emailButton = createEmailButton(content);
+                messageContent.appendChild(emailButton);
+            }
             
             messageDiv.appendChild(avatar);
             messageDiv.appendChild(messageContent);
@@ -849,6 +1150,12 @@
             
             messageContent.appendChild(messageText);
             messageContent.appendChild(messageTime);
+            
+            // Add email button for doctor recommendations
+            if (!isUser && hasDoctorRecommendations(content)) {
+                const emailButton = createEmailButton(content);
+                messageContent.appendChild(emailButton);
+            }
             
             messageDiv.appendChild(avatar);
             messageDiv.appendChild(messageContent);
@@ -1724,5 +2031,27 @@
             }
         });
     </script>
+
+    <!-- Email Modal -->
+    <div id="emailModal" class="email-modal">
+        <div class="email-modal-content">
+            <button class="close-modal" onclick="closeEmailModal()">&times;</button>
+            <div class="modal-header">
+                <h2>📧 Send Doctor Recommendations</h2>
+                <p>Enter your email address to receive the doctor recommendations</p>
+            </div>
+            <div class="email-input-group">
+                <label for="emailInput">Email Address:</label>
+                <input type="email" id="emailInput" class="email-input" placeholder="Enter your email address" autocomplete="email">
+            </div>
+            <div class="modal-buttons">
+                <button class="modal-btn modal-btn-cancel" onclick="closeEmailModal()">Cancel</button>
+                <button class="modal-btn modal-btn-send" id="sendEmailBtn" onclick="sendDoctorEmail()">
+                    <i class="fas fa-paper-plane"></i> Send Email
+                </button>
+            </div>
+        </div>
+    </div>
+
 </body>
 </html>
