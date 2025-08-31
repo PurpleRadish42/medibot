@@ -203,116 +203,86 @@ class DoctorRecommender:
             return []
     
     def format_doctor_recommendations(self, doctors: List[Dict], specialist_type: str) -> str:
-        """Format doctor recommendations for chat response"""
+        """Format doctor recommendations for chat response as HTML table"""
         if not doctors:
             return f"I recommend consulting a {specialist_type}. Unfortunately, I don't have specific doctor recommendations available in your area right now. Please consult your local healthcare directory or contact your nearest hospital."
         
-        response = f"Based on your symptoms, I recommend consulting a {specialist_type}. Here are {len(doctors)} qualified doctors I found:\n\n"
+        response = f"<p>Based on your symptoms, I recommend consulting a <strong>{specialist_type}</strong>. Here are {len(doctors)} qualified doctors I found:</p>\n\n"
+        
+        # Start the HTML table
+        response += """
+        <table style="border-collapse: collapse; width: 100%; margin: 20px 0; font-family: Arial, sans-serif; background: rgba(255, 255, 255, 0.9); border-radius: 8px; overflow: hidden;">
+            <thead>
+                <tr style="background: linear-gradient(45deg, #4facfe, #00f2fe); color: white; border-bottom: 2px solid #dee2e6;">
+                    <th style="border: 1px solid #dee2e6; padding: 12px; text-align: left; font-weight: bold;">#</th>
+                    <th style="border: 1px solid #dee2e6; padding: 12px; text-align: left; font-weight: bold;">Doctor Name</th>
+                    <th style="border: 1px solid #dee2e6; padding: 12px; text-align: left; font-weight: bold;">Specialty</th>
+                    <th style="border: 1px solid #dee2e6; padding: 12px; text-align: left; font-weight: bold;">Qualification</th>
+                    <th style="border: 1px solid #dee2e6; padding: 12px; text-align: left; font-weight: bold;">Experience</th>
+                    <th style="border: 1px solid #dee2e6; padding: 12px; text-align: left; font-weight: bold;">Location</th>
+                    <th style="border: 1px solid #dee2e6; padding: 12px; text-align: left; font-weight: bold;">Fee</th>
+                    <th style="border: 1px solid #dee2e6; padding: 12px; text-align: left; font-weight: bold;">Rating</th>
+                    <th style="border: 1px solid #dee2e6; padding: 12px; text-align: left; font-weight: bold;">Profile</th>
+                    <th style="border: 1px solid #dee2e6; padding: 12px; text-align: left; font-weight: bold;">Maps</th>
+                </tr>
+            </thead>
+            <tbody>
+        """
         
         for i, doctor in enumerate(doctors, 1):
-            response += f"🏥 **{i}. Dr. {doctor['name']}**\n"
-            response += f"   • Specialty: {doctor['specialty']}\n"
-            response += f"   • Qualification: {doctor['degree']}\n"
-            response += f"   • Experience: {doctor['experience']}\n"
-            response += f"   • Location: {doctor['location']}, {doctor['city']}\n"
-            response += f"   • Consultation Fee: {doctor['consultation_fee']}\n"
-            response += f"   • Rating: {doctor['score']}\n"
-            
+            # Handle profile URL
+            profile_link = ""
             if doctor['profile_url'] and doctor['profile_url'] != 'nan':
-                response += f"   • Profile: {doctor['profile_url']}\n"
+                profile_link = f'<a href="{doctor["profile_url"]}" target="_blank" style="color: #007bff; text-decoration: none; font-weight: bold;">View Profile</a>'
+            else:
+                profile_link = "Not available"
+                
+            # Handle Google Maps link
+            maps_link = ""
             if doctor['google_map_link'] and doctor['google_map_link'] != 'nan':
-                response += f"   • Maps: {doctor['google_map_link']}\n"
-            
-            response += "\n"
+                maps_link = f'<a href="{doctor["google_map_link"]}" target="_blank" style="color: #007bff; text-decoration: none; font-weight: bold;">View Map</a>'
+            else:
+                maps_link = "Not available"
+                
+            # Add table row
+            row_style = "background-color: #ffffff;" if i % 2 == 1 else "background-color: #f8f9fa;"
+            response += f"""
+                <tr style="{row_style}">
+                    <td style="border: 1px solid #dee2e6; padding: 10px; text-align: center; font-weight: bold; color: #4facfe;">{i}</td>
+                    <td style="border: 1px solid #dee2e6; padding: 10px;"><strong>Dr. {doctor['name']}</strong></td>
+                    <td style="border: 1px solid #dee2e6; padding: 10px;">{doctor['specialty']}</td>
+                    <td style="border: 1px solid #dee2e6; padding: 10px;">{doctor['degree']}</td>
+                    <td style="border: 1px solid #dee2e6; padding: 10px;">{doctor['experience']}</td>
+                    <td style="border: 1px solid #dee2e6; padding: 10px;">{doctor['location']}, {doctor['city']}</td>
+                    <td style="border: 1px solid #dee2e6; padding: 10px; font-weight: bold; color: #28a745;">{doctor['consultation_fee']}</td>
+                    <td style="border: 1px solid #dee2e6; padding: 10px; text-align: center;"><strong style="color: #ffc107;">{doctor['score']}</strong></td>
+                    <td style="border: 1px solid #dee2e6; padding: 10px; text-align: center;">{profile_link}</td>
+                    <td style="border: 1px solid #dee2e6; padding: 10px; text-align: center;">{maps_link}</td>
+                </tr>
+            """
         
-        response += "📋 **Important Notes:**\n"
-        response += "• Please verify doctor availability before visiting\n"
-        response += "• Consultation fees may have changed\n"
-        response += "• In case of emergency, visit the nearest hospital immediately\n"
-        response += "• This is for informational purposes only"
+        # Close the table
+        response += """
+            </tbody>
+        </table>
+        """
+        
+        # Add important notes
+        response += """
+        <div style="margin-top: 20px; padding: 15px; background: linear-gradient(45deg, #e9ecef, #f8f9fa); border-radius: 8px; font-family: Arial, sans-serif; border-left: 4px solid #4facfe;">
+            <h4 style="margin-top: 0; color: #495057; display: flex; align-items: center;"><i class="fas fa-clipboard-list" style="margin-right: 8px; color: #4facfe;"></i> Important Notes:</h4>
+            <ul style="margin-bottom: 0; color: #6c757d; line-height: 1.6;">
+                <li>Please verify doctor availability before visiting</li>
+                <li>Consultation fees may have changed</li>
+                <li>In case of emergency, visit the nearest hospital immediately</li>
+                <li>This is for informational purposes only</li>
+            </ul>
+        </div>
+        """
         
         return response
 
-    # def format_doctor_recommendations(self, doctors: List[Dict], specialist_type: str):
-    #     """Format doctor recommendations for chat response as HTML table"""
-    #     if not doctors:
-    #         return Markup(f"I recommend consulting a {specialist_type}. Unfortunately, I don't have specific doctor recommendations available in your area right now. Please consult your local healthcare directory or contact your nearest hospital.")
-    
-    #     response = f"<p>Based on your symptoms, I recommend consulting a <strong>{specialist_type}</strong>. Here are {len(doctors)} qualified doctors I found:</p>\n\n"
-    
-    #     # Start the HTML table
-    #     response += """
-    #     <table style="border-collapse: collapse; width: 100%; margin: 20px 0; font-family: Arial, sans-serif;">
-    #         <thead>
-    #             <tr style="background-color: #f8f9fa; border-bottom: 2px solid #dee2e6;">
-    #                 <th style="border: 1px solid #dee2e6; padding: 12px; text-align: left;">#</th>
-    #                 <th style="border: 1px solid #dee2e6; padding: 12px; text-align: left;">Doctor Name</th>
-    #                 <th style="border: 1px solid #dee2e6; padding: 12px; text-align: left;">Specialty</th>
-    #                 <th style="border: 1px solid #dee2e6; padding: 12px; text-align: left;">Qualification</th>
-    #                 <th style="border: 1px solid #dee2e6; padding: 12px; text-align: left;">Experience</th>
-    #                 <th style="border: 1px solid #dee2e6; padding: 12px; text-align: left;">Location</th>
-    #                 <th style="border: 1px solid #dee2e6; padding: 12px; text-align: left;">Consultation Fee</th>
-    #                 <th style="border: 1px solid #dee2e6; padding: 12px; text-align: left;">Rating</th>
-    #                 <th style="border: 1px solid #dee2e6; padding: 12px; text-align: left;">Profile</th>
-    #                 <th style="border: 1px solid #dee2e6; padding: 12px; text-align: left;">Location Map</th>
-    #             </tr>
-    #         </thead>
-    #         <tbody>
-    #     """
-    
-    #     for i, doctor in enumerate(doctors, 1):
-    #         # Handle profile URL
-    #         profile_link = ""
-    #         if doctor['profile_url'] and doctor['profile_url'] != 'nan':
-    #             profile_link = f'<a href="{doctor["profile_url"]}" target="_blank" style="color: #007bff; text-decoration: none;">Click here</a>'
-    #         else:
-    #             profile_link = "Not available"
-            
-    #         # Handle Google Maps link
-    #         maps_link = ""
-    #         if doctor['google_map_link'] and doctor['google_map_link'] != 'nan':
-    #             maps_link = f'<a href="{doctor["google_map_link"]}" target="_blank" style="color: #007bff; text-decoration: none;">Click here</a>'
-    #         else:
-    #             maps_link = "Not available"
-            
-    #         # Add table row
-    #         row_style = "background-color: #ffffff;" if i % 2 == 1 else "background-color: #f8f9fa;"
-    #         response += f"""
-    #             <tr style="{row_style}">
-    #                 <td style="border: 1px solid #dee2e6; padding: 10px; text-align: center; font-weight: bold;">{i}</td>
-    #                 <td style="border: 1px solid #dee2e6; padding: 10px;"><strong>Dr. {doctor['name']}</strong></td>
-    #                 <td style="border: 1px solid #dee2e6; padding: 10px;">{doctor['specialty']}</td>
-    #                 <td style="border: 1px solid #dee2e6; padding: 10px;">{doctor['degree']}</td>
-    #                 <td style="border: 1px solid #dee2e6; padding: 10px;">{doctor['experience']}</td>
-    #                 <td style="border: 1px solid #dee2e6; padding: 10px;">{doctor['location']}, {doctor['city']}</td>
-    #                 <td style="border: 1px solid #dee2e6; padding: 10px;">{doctor['consultation_fee']}</td>
-    #                 <td style="border: 1px solid #dee2e6; padding: 10px; text-align: center;"><strong>{doctor['score']}</strong></td>
-    #                 <td style="border: 1px solid #dee2e6; padding: 10px; text-align: center;">{profile_link}</td>
-    #                 <td style="border: 1px solid #dee2e6; padding: 10px; text-align: center;">{maps_link}</td>
-    #             </tr>
-    #         """
-    
-    #     # Close the table
-    #     response += """
-    #         </tbody>
-    #     </table>
-    #     """
-    
-    #     # Add important notes
-    #     response += """
-    #     <div style="margin-top: 20px; padding: 15px; background-color: #e9ecef; border-radius: 5px; font-family: Arial, sans-serif;">
-    #         <h4 style="margin-top: 0; color: #495057;">📋 Important Notes:</h4>
-    #         <ul style="margin-bottom: 0; color: #6c757d;">
-    #             <li>Please verify doctor availability before visiting</li>
-    #             <li>Consultation fees may have changed</li>
-    #             <li>In case of emergency, visit the nearest hospital immediately</li>
-    #             <li>This is for informational purposes only</li>
-    #         </ul>
-    #     </div>
-    #     """
-    
-    #     return Markup(response)
-    
+
     def get_statistics(self) -> Dict:
         """Get statistics about the doctors database"""
         if self.doctors_df is None:
