@@ -695,17 +695,21 @@ class MedibotAuthDatabase:
         try:
             import re
             
-            # Common medical symptom keywords
+            # Common medical symptom keywords (including both singular and plural forms)
             medical_keywords = [
-                'headache', 'fever', 'cough', 'cold', 'pain', 'ache', 'sore', 'throat',
-                'stomach', 'nausea', 'vomit', 'diarrhea', 'constipation', 'fatigue', 'tired',
-                'dizzy', 'weak', 'swelling', 'rash', 'itch', 'burn', 'bleeding', 'bruise',
-                'chest', 'heart', 'breath', 'shortness', 'difficulty', 'muscle', 'joint',
-                'back', 'neck', 'shoulder', 'knee', 'ankle', 'wrist', 'elbow', 'hip',
-                'eye', 'ear', 'nose', 'mouth', 'tooth', 'gum', 'tongue', 'lip',
-                'skin', 'hair', 'nail', 'foot', 'hand', 'arm', 'leg', 'finger', 'toe',
-                'sick', 'ill', 'hurt', 'feel', 'problem', 'issue', 'uncomfortable',
-                'tender', 'swollen', 'inflammation', 'infection', 'allergy', 'sensitive'
+                'headache', 'headaches', 'fever', 'cough', 'cold', 'pain', 'ache', 'aches', 'sore', 'throat',
+                'stomach', 'nausea', 'nauseous', 'vomit', 'vomiting', 'diarrhea', 'constipation', 
+                'fatigue', 'tired', 'dizzy', 'weak', 'weakness', 'swelling', 'swollen', 'rash', 
+                'itch', 'itchy', 'burn', 'burning', 'bleeding', 'bruise', 'bruises',
+                'chest', 'heart', 'breath', 'breathing', 'shortness', 'difficulty', 'muscle', 'muscles',
+                'joint', 'joints', 'back', 'neck', 'shoulder', 'shoulders', 'knee', 'knees', 
+                'ankle', 'ankles', 'wrist', 'wrists', 'elbow', 'elbows', 'hip', 'hips',
+                'eye', 'eyes', 'ear', 'ears', 'nose', 'mouth', 'tooth', 'teeth', 'gum', 'gums',
+                'tongue', 'lip', 'lips', 'skin', 'hair', 'nail', 'nails', 'foot', 'feet',
+                'hand', 'hands', 'arm', 'arms', 'leg', 'legs', 'finger', 'fingers', 'toe', 'toes',
+                'sick', 'ill', 'hurt', 'hurts', 'hurting', 'feel', 'feeling', 'problem', 'problems',
+                'issue', 'issues', 'uncomfortable', 'tender', 'inflammation', 'infected', 'infection',
+                'allergy', 'allergic', 'sensitive', 'sensitivity', 'migraine', 'migraines'
             ]
             
             # Clean text and extract words
