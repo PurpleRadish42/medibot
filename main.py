@@ -28,6 +28,9 @@ import gradio as gr
 # Import authentication database
 from medibot2_auth import MedibotAuthDatabase
 
+# Import our improved chat history database
+from chat_history_db import ChatHistoryDB
+
 # Import your medical recommender directly with doctor integration
 medical_recommender = None
 medical_functions_available = False
@@ -62,6 +65,9 @@ app.secret_key = os.getenv('SECRET_KEY', 'your-secret-key-change-this-in-product
 
 # Initialize authentication database
 auth_db = MedibotAuthDatabase()
+
+# Initialize improved chat history database
+chat_db = ChatHistoryDB()
 
 # Store conversation histories for each user
 user_conversations = {}
@@ -335,6 +341,27 @@ def api_chat():
         except Exception as e:
             print(f"⚠ Failed to save chat to database: {e}")
         
+        # ALSO save to new improved chat history database
+        try:
+            # Get session_id from request data or create new session
+            session_id = data.get('session_id')
+            new_user_id = chat_db.get_or_create_user(request.user['username'], request.user.get('email'))
+            
+            if not session_id:
+                # Create new session with title from first part of message
+                title = message[:50] + "..." if len(message) > 50 else message
+                session_id = chat_db.create_chat_session(new_user_id, title)
+                print(f"📝 Created new chat session: {session_id}")
+            
+            # Save user message and assistant response
+            chat_db.save_message(session_id, new_user_id, "user", message)
+            chat_db.save_message(session_id, new_user_id, "assistant", response)
+            print(f"💾 Chat saved to improved database (session: {session_id})")
+            
+        except Exception as e:
+            print(f"⚠ Failed to save to improved chat database: {e}")
+            session_id = None
+        
         # EHR Integration: Check if message contains symptoms and save them
         try:
             # Simple symptom detection - check if message talks about health issues
@@ -378,7 +405,10 @@ def api_chat():
             import traceback
             traceback.print_exc()
         
-        return jsonify({'response': response})
+        return jsonify({
+            'response': response,
+            'session_id': session_id  # Include session_id for frontend
+        })
     
     except Exception as e:
         print(f"❌ API Error in /api/chat: {e}")
@@ -581,6 +611,63 @@ def api_chat_history():
     except Exception as e:
         print(f"Chat history error: {e}")
         return jsonify({'error': 'Failed to retrieve chat history'}), 500
+
+# New improved chat history endpoints
+@app.route('/api/chat-sessions')
+@login_required
+def api_chat_sessions():
+    """Get user's chat sessions using improved database"""
+    try:
+        user_id = request.user['id']
+        # Get or create user in new database
+        new_user_id = chat_db.get_or_create_user(request.user['username'], request.user.get('email'))
+        
+        sessions = chat_db.get_user_sessions(new_user_id)
+        return jsonify({
+            'success': True,
+            'sessions': sessions
+        })
+    except Exception as e:
+        print(f"Chat sessions error: {e}")
+        return jsonify({'error': 'Failed to retrieve chat sessions'}), 500
+
+@app.route('/api/chat-session/<session_id>')
+@login_required
+def api_get_chat_session(session_id):
+    """Get messages for a specific chat session"""
+    try:
+        user_id = request.user['id']
+        new_user_id = chat_db.get_or_create_user(request.user['username'], request.user.get('email'))
+        
+        messages = chat_db.get_session_messages(session_id, new_user_id)
+        return jsonify({
+            'success': True,
+            'messages': messages
+        })
+    except Exception as e:
+        print(f"Session retrieval error: {e}")
+        return jsonify({'error': 'Failed to retrieve session messages'}), 500
+
+@app.route('/api/new-chat-session', methods=['POST'])
+@login_required
+def api_new_chat_session():
+    """Create a new chat session"""
+    try:
+        data = request.get_json() or {}
+        title = data.get('title', 'New Chat')
+        
+        user_id = request.user['id']
+        new_user_id = chat_db.get_or_create_user(request.user['username'], request.user.get('email'))
+        
+        session_id = chat_db.create_chat_session(new_user_id, title)
+        return jsonify({
+            'success': True,
+            'session_id': session_id,
+            'title': title
+        })
+    except Exception as e:
+        print(f"New chat session error: {e}")
+        return jsonify({'error': 'Failed to create new chat session'}), 500
 
 @app.route('/api/user')
 @login_required
