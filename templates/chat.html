@@ -1635,35 +1635,75 @@
         // Load chat history from database
         async function loadDatabaseChatHistory() {
             try {
-                console.log("📖 Loading conversations from database...");
+                console.log("📖 Loading chat history from database...");
                 
-                const response = await fetch('/api/conversations');
+                const response = await fetch('/api/chat-history');
                 if (!response.ok) {
-                    console.warn("❌ Failed to load conversations from database:", response.status);
+                    console.warn("❌ Failed to load chat history from database:", response.status);
                     return;
                 }
                 
                 const data = await response.json();
                 if (!data.success) {
-                    console.warn("❌ Conversations API returned error:", data.error);
+                    console.warn("❌ Chat history API returned error:", data.error);
                     return;
                 }
                 
-                console.log(`✅ Loaded ${data.conversations.length} conversations from database`);
+                console.log(`✅ Loaded ${data.history.length} messages from database`);
                 
-                // Convert conversations to chat sessions for sidebar
-                const chatSessions = convertConversationsToChatSessions(data.conversations);
+                // Convert history to chat sessions for sidebar
+                const chatSessions = convertHistoryToChatSessions(data.history);
                 console.log(`📋 Converted to ${chatSessions.length} chat sessions`);
                 
                 // Display in sidebar
                 displayChatSessions(chatSessions);
                 
             } catch (error) {
-                console.error("❌ Error loading database conversations:", error);
+                console.error("❌ Error loading database chat history:", error);
             }
         }
         
-        // Convert conversations API format to chat sessions
+        // Convert chat history API format to chat sessions
+        function convertHistoryToChatSessions(history) {
+            const sessions = [];
+            let sessionId = 1;
+            
+            // Group consecutive messages into sessions
+            // Each history entry has {message, response, timestamp}
+            for (let i = 0; i < history.length; i++) {
+                const entry = history[i];
+                
+                // Create a session for each message/response pair
+                const sessionTitle = `Chat ${sessionId}`;
+                const messages = [
+                    {
+                        content: entry.message,
+                        isUser: true,
+                        timestamp: entry.timestamp
+                    },
+                    {
+                        content: entry.response,
+                        isUser: false,
+                        timestamp: entry.timestamp
+                    }
+                ];
+                
+                sessions.push({
+                    id: `db-session-${sessionId}`,
+                    title: sessionTitle,
+                    messages: messages,
+                    date: entry.timestamp,
+                    source: 'database',
+                    messageCount: 2
+                });
+                
+                sessionId++;
+            }
+            
+            return sessions.reverse(); // Show newest first
+        }
+        
+        // Convert conversations API format to chat sessions (legacy)
         function convertConversationsToChatSessions(conversations) {
             const sessions = [];
             

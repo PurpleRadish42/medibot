@@ -176,20 +176,16 @@ class DoctorRecommender:
             # Format recommendations
             recommendations = []
             for _, doctor in top_doctors.iterrows():
-                # Clean and format the data
-                experience = doctor.get('year_of_experience', 0)
-                fee = doctor.get('consultation_fee', 0)
-                score = doctor.get('dp_score', 0)
+                # Only use dp_score as rating, skip problematic experience/fee data
+                dp_score = doctor.get('dp_score', 0)
                 
                 recommendations.append({
                     'name': str(doctor['name']),
                     'specialty': str(doctor['speciality']),
                     'degree': str(doctor.get('degree', 'Not specified')),
-                    'experience': f"{int(experience)} years" if experience > 0 else 'Experience not specified',
                     'city': str(doctor['city']),
                     'location': str(doctor.get('location', 'Location not specified')),
-                    'consultation_fee': f"₹{int(fee)}" if fee > 0 and fee < 999999 else 'Fee not specified',
-                    'score': f"{score:.1f}/5" if score > 0 else 'Not rated',
+                    'dp_score': f"{dp_score:.0f}" if pd.notna(dp_score) and dp_score > 0 else 'Not rated',
                     'profile_url': str(doctor.get('profile_url', '')),
                     'google_map_link': str(doctor.get('google_map_link', ''))
                 })
@@ -218,10 +214,8 @@ class DoctorRecommender:
                     <th style="border: 1px solid #dee2e6; padding: 12px; text-align: left; font-weight: bold;">Doctor Name</th>
                     <th style="border: 1px solid #dee2e6; padding: 12px; text-align: left; font-weight: bold;">Specialty</th>
                     <th style="border: 1px solid #dee2e6; padding: 12px; text-align: left; font-weight: bold;">Qualification</th>
-                    <th style="border: 1px solid #dee2e6; padding: 12px; text-align: left; font-weight: bold;">Experience</th>
                     <th style="border: 1px solid #dee2e6; padding: 12px; text-align: left; font-weight: bold;">Location</th>
-                    <th style="border: 1px solid #dee2e6; padding: 12px; text-align: left; font-weight: bold;">Fee</th>
-                    <th style="border: 1px solid #dee2e6; padding: 12px; text-align: left; font-weight: bold;">Rating</th>
+                    <th style="border: 1px solid #dee2e6; padding: 12px; text-align: left; font-weight: bold;">DP Score</th>
                     <th style="border: 1px solid #dee2e6; padding: 12px; text-align: left; font-weight: bold;">Profile</th>
                     <th style="border: 1px solid #dee2e6; padding: 12px; text-align: left; font-weight: bold;">Maps</th>
                 </tr>
@@ -252,10 +246,8 @@ class DoctorRecommender:
                     <td style="border: 1px solid #dee2e6; padding: 10px;"><strong>Dr. {doctor['name']}</strong></td>
                     <td style="border: 1px solid #dee2e6; padding: 10px;">{doctor['specialty']}</td>
                     <td style="border: 1px solid #dee2e6; padding: 10px;">{doctor['degree']}</td>
-                    <td style="border: 1px solid #dee2e6; padding: 10px;">{doctor['experience']}</td>
                     <td style="border: 1px solid #dee2e6; padding: 10px;">{doctor['location']}, {doctor['city']}</td>
-                    <td style="border: 1px solid #dee2e6; padding: 10px; font-weight: bold; color: #28a745;">{doctor['consultation_fee']}</td>
-                    <td style="border: 1px solid #dee2e6; padding: 10px; text-align: center;"><strong style="color: #ffc107;">{doctor['score']}</strong></td>
+                    <td style="border: 1px solid #dee2e6; padding: 10px; text-align: center;"><strong style="color: #28a745;">{doctor['dp_score']}</strong></td>
                     <td style="border: 1px solid #dee2e6; padding: 10px; text-align: center;">{profile_link}</td>
                     <td style="border: 1px solid #dee2e6; padding: 10px; text-align: center;">{maps_link}</td>
                 </tr>
