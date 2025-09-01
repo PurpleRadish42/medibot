@@ -351,7 +351,11 @@ def api_chat():
                 # Extract keywords and save symptoms
                 keywords = auth_db.extract_symptom_keywords(message)
                 if keywords:  # Only save if we found relevant keywords
-                    conversation_id = session_token or f"user-{user_id}-{int(time.time())}"
+                    # Get conversation_id from the user's session data
+                    conversation_id = request.user.get('conversation_id')
+                    if not conversation_id:
+                        # Fallback: create a conversation ID if none exists
+                        conversation_id = f"user-{user_id}-{int(time.time())}"
                     
                     symptom_id = auth_db.save_patient_symptoms(
                         user_id=user_id,
@@ -361,13 +365,20 @@ def api_chat():
                     )
                     
                     if symptom_id:
+                        print(f"✅ Symptoms saved with ID: {symptom_id}")
                         # Check for similar historical symptoms
                         similar_symptoms = auth_db.find_similar_symptoms(user_id, message)
                         if similar_symptoms:
                             print(f"🔍 Found {len(similar_symptoms)} similar historical symptoms")
+                    else:
+                        print("❌ Failed to save symptoms to database")
+                else:
+                    print("ℹ️ No specific medical keywords found, symptoms not saved")
                         
         except Exception as e:
             print(f"⚠ EHR integration error: {e}")
+            import traceback
+            traceback.print_exc()
         
         return jsonify({'response': response})
     
