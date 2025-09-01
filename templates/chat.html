@@ -1464,10 +1464,13 @@
                             throw new Error(data.error || 'Failed to load conversation');
                         }
                         
+                        // Convert database message format to frontend format
+                        const convertedMessages = convertDatabaseMessagesToFrontendFormat(data.messages || []);
+                        
                         chat = {
                             id: chatId,
                             title: title,
-                            messages: data.messages || [],
+                            messages: convertedMessages,
                             date: new Date().toISOString(),
                             source: 'database'
                         };
@@ -1666,13 +1669,69 @@
                     id: conv.id,
                     title: conv.title,
                     messages: [], // Will be loaded when clicked
-                    date: conv.last_message,
+                    date: conv.updated_at || conv.created_at,
                     source: 'database',
                     messageCount: conv.message_count
                 });
             }
             
             return sessions;
+        }
+        
+        // Convert database message format to frontend format
+        function convertDatabaseMessagesToFrontendFormat(dbMessages) {
+            const frontendMessages = [];
+            
+            console.log("🔄 Converting database messages to frontend format:", dbMessages);
+            
+            // Database format: {type: 'user'|'assistant', message: string, response: string, ...}
+            // Frontend format: {content: string, isUser: boolean, timestamp: string}
+            
+            // Sort messages by order and timestamp to ensure proper sequence
+            const sortedMessages = dbMessages.sort((a, b) => {
+                if (a.order !== b.order) {
+                    return (a.order || 0) - (b.order || 0);
+                }
+                return new Date(a.timestamp || 0) - new Date(b.timestamp || 0);
+            });
+            
+            for (const dbMsg of sortedMessages) {
+                if (dbMsg.type === 'user' && dbMsg.message) {
+                    // Add user message
+                    frontendMessages.push({
+                        content: dbMsg.message,
+                        isUser: true,
+                        timestamp: dbMsg.timestamp || new Date().toISOString()
+                    });
+                }
+                
+                if (dbMsg.type === 'assistant' && dbMsg.response) {
+                    // Add assistant response (preserve HTML for doctor recommendations)
+                    frontendMessages.push({
+                        content: dbMsg.response,
+                        isUser: false,
+                        timestamp: dbMsg.timestamp || new Date().toISOString()
+                    });
+                }
+                
+                // Handle combined messages where both message and response are in the same record
+                if (dbMsg.message && dbMsg.response && !dbMsg.type) {
+                    // This is a legacy format - add both user message and bot response
+                    frontendMessages.push({
+                        content: dbMsg.message,
+                        isUser: true,
+                        timestamp: dbMsg.timestamp || new Date().toISOString()
+                    });
+                    frontendMessages.push({
+                        content: dbMsg.response,
+                        isUser: false,
+                        timestamp: dbMsg.timestamp || new Date().toISOString()
+                    });
+                }
+            }
+            
+            console.log(`✅ Converted ${dbMessages.length} database messages to ${frontendMessages.length} frontend messages`);
+            return frontendMessages;
         }
         
         // Convert database format to chat sessions
