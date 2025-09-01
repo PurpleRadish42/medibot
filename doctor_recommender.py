@@ -119,14 +119,14 @@ class DoctorRecommender:
         print(f"❌ No match found for '{recommended_specialist}'")
         return None
     
-    def recommend_doctors(self, specialist_type: str, city: str = None, limit: int = 5) -> List[Dict]:
-        """Recommend doctors based on specialist type - SIMPLIFIED"""
+    def recommend_doctors(self, specialist_type: str, city: str = None, limit: int = 5, sort_by: str = "rating") -> List[Dict]:
+        """Recommend doctors based on specialist type with sorting options - SIMPLIFIED"""
         if self.doctors_df is None:
             print("❌ No doctor data loaded")
             return []
         
         try:
-            print(f"\n🏥 Searching for {specialist_type}" + (f" in {city}" if city else ""))
+            print(f"\n🏥 Searching for {specialist_type}" + (f" in {city}" if city else "") + f" (sorted by {sort_by})")
             
             # Find exact matching specialty
             exact_specialty = self.find_specialty_match(specialist_type)
@@ -142,7 +142,7 @@ class DoctorRecommender:
             
             print(f"🔍 Found {len(filtered_doctors)} {exact_specialty}s in database")
             
-            # Filter by city if provided
+            # Filter by city if provided (for location-based sorting)
             if city and len(filtered_doctors) > 0:
                 city_filtered = filtered_doctors[
                     filtered_doctors['city'].str.contains(city, case=False, na=False)
@@ -158,16 +158,25 @@ class DoctorRecommender:
                 print("❌ No doctors found after filtering")
                 return []
             
-            # Sort by score, experience, and fees
             # Fill NaN values for sorting
             filtered_doctors['dp_score'] = filtered_doctors['dp_score'].fillna(0)
             filtered_doctors['year_of_experience'] = filtered_doctors['year_of_experience'].fillna(0)
             filtered_doctors['consultation_fee'] = filtered_doctors['consultation_fee'].fillna(999999)
             
-            # Sort: Best score first, most experience first, lowest fee first
-            filtered_doctors = filtered_doctors.sort_values([
-                'dp_score', 'year_of_experience', 'consultation_fee'
-            ], ascending=[False, False, True])
+            # Sort based on preference
+            if sort_by == "location" and city:
+                # For location-based sorting, we already filtered by city
+                # Sort by score within the city
+                filtered_doctors = filtered_doctors.sort_values([
+                    'dp_score', 'year_of_experience', 'consultation_fee'
+                ], ascending=[False, False, True])
+                print(f"📍 Sorted by location (within {city}) and then by rating")
+            else:
+                # Default rating-based sorting: Best score first, most experience first, lowest fee first
+                filtered_doctors = filtered_doctors.sort_values([
+                    'dp_score', 'year_of_experience', 'consultation_fee'
+                ], ascending=[False, False, True])
+                print(f"⭐ Sorted by ratings and experience")
             
             # Get top recommendations
             top_doctors = filtered_doctors.head(limit)
