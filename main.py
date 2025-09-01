@@ -351,11 +351,9 @@ def api_chat():
                 # Extract keywords and save symptoms
                 keywords = auth_db.extract_symptom_keywords(message)
                 if keywords:  # Only save if we found relevant keywords
-                    # Get conversation_id from the user's session data
-                    conversation_id = request.user.get('conversation_id')
-                    if not conversation_id:
-                        # Fallback: create a conversation ID if none exists
-                        conversation_id = f"user-{user_id}-{int(time.time())}"
+                    # Generate conversation_id based on session token and current time
+                    session_token = request.cookies.get('session_token', '')
+                    conversation_id = f"conv-{session_token[-8:] if session_token else 'anon'}-{int(time.time() // 3600)}"  # Hour-based conversation grouping
                     
                     symptom_id = auth_db.save_patient_symptoms(
                         user_id=user_id,

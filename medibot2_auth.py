@@ -29,7 +29,15 @@ class MedibotAuthDatabase:
             'charset': 'utf8mb4',
             'autocommit': False
         }
-        self.init_database()
+        self.db_available = False
+        try:
+            self.init_database()
+            self.db_available = True
+            print("✅ Database initialized successfully")
+        except Exception as e:
+            print(f"⚠️  Database initialization failed: {e}")
+            print("📋 Application will start with limited functionality")
+            self.db_available = False
     
     def get_connection(self):
         """Get a MySQL database connection"""
@@ -537,6 +545,10 @@ class MedibotAuthDatabase:
     
     def get_chat_history(self, user_id, limit=50):
         """Get user's recent chat history"""
+        if not self.db_available:
+            print("⚠️  Database not available, returning empty chat history")
+            return []
+            
         try:
             conn = self.get_connection()
             cursor = conn.cursor()
@@ -574,6 +586,10 @@ class MedibotAuthDatabase:
     # EHR (Electronic Health Record) Methods
     def save_patient_symptoms(self, user_id, conversation_id, symptoms_text, keywords=None, severity=None, category=None):
         """Save patient symptoms to EHR system"""
+        if not self.db_available:
+            print("⚠️  Database not available, cannot save symptoms")
+            return None
+            
         try:
             conn = self.get_connection()
             cursor = conn.cursor()
@@ -597,6 +613,10 @@ class MedibotAuthDatabase:
 
     def get_patient_symptoms(self, user_id, limit=50):
         """Get patient's historical symptoms"""
+        if not self.db_available:
+            print("⚠️  Database not available, returning empty symptoms list")
+            return []
+            
         try:
             conn = self.get_connection()
             cursor = conn.cursor()
