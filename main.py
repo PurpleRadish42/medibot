@@ -335,6 +335,40 @@ def api_chat():
         except Exception as e:
             print(f"⚠ Failed to save chat to database: {e}")
         
+        # EHR Integration: Check if message contains symptoms and save them
+        try:
+            # Simple symptom detection - check if message talks about health issues
+            symptom_indicators = [
+                'feel', 'pain', 'hurt', 'ache', 'sick', 'ill', 'symptom', 'problem',
+                'headache', 'fever', 'cough', 'cold', 'tired', 'weak', 'dizzy',
+                'nausea', 'vomit', 'stomach', 'chest', 'throat', 'back', 'neck'
+            ]
+            
+            message_lower = message.lower()
+            if any(indicator in message_lower for indicator in symptom_indicators):
+                print(f"🏥 Detected potential symptoms in message: {message[:50]}...")
+                
+                # Extract keywords and save symptoms
+                keywords = auth_db.extract_symptom_keywords(message)
+                if keywords:  # Only save if we found relevant keywords
+                    conversation_id = session_token or f"user-{user_id}-{int(time.time())}"
+                    
+                    symptom_id = auth_db.save_patient_symptoms(
+                        user_id=user_id,
+                        conversation_id=conversation_id,
+                        symptoms_text=message,
+                        keywords=keywords
+                    )
+                    
+                    if symptom_id:
+                        # Check for similar historical symptoms
+                        similar_symptoms = auth_db.find_similar_symptoms(user_id, message)
+                        if similar_symptoms:
+                            print(f"🔍 Found {len(similar_symptoms)} similar historical symptoms")
+                        
+        except Exception as e:
+            print(f"⚠ EHR integration error: {e}")
+        
         return jsonify({'response': response})
     
     except Exception as e:
@@ -668,6 +702,105 @@ def api_clear_all_chats():
         
     except Exception as e:
         print(f"Clear all chats error: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+# EHR (Electronic Health Record) API endpoints
+@app.route('/api/ehr/symptoms', methods=['POST'])
+@login_required
+def api_save_symptoms():
+    """Save patient symptoms to EHR system"""
+    try:
+        data = request.get_json()
+        user_id = request.user['id']
+        
+        symptoms_text = data.get('symptoms', '').strip()
+        conversation_id = data.get('conversation_id', '')
+        
+        if not symptoms_text:
+            return jsonify({'success': False, 'error': 'Symptoms text is required'}), 400
+        
+        # Extract keywords and determine category
+        keywords = auth_db.extract_symptom_keywords(symptoms_text)
+        
+        # Simple severity detection based on keywords
+        severity = 'mild'
+        urgent_words = ['severe', 'extreme', 'unbearable', 'emergency', 'urgent', 'blood', 'chest pain']
+        if any(word in symptoms_text.lower() for word in urgent_words):
+            severity = 'severe'
+        elif any(word in symptoms_text.lower() for word in ['moderate', 'bad', 'worse', 'painful']):
+            severity = 'moderate'
+        
+        # Save symptoms
+        symptom_id = auth_db.save_patient_symptoms(
+            user_id=user_id,
+            conversation_id=conversation_id,
+            symptoms_text=symptoms_text,
+            keywords=keywords,
+            severity=severity
+        )
+        
+        if symptom_id:
+            # Check for similar historical symptoms
+            similar_symptoms = auth_db.find_similar_symptoms(user_id, symptoms_text)
+            
+            return jsonify({
+                'success': True,
+                'symptom_id': symptom_id,
+                'keywords': keywords,
+                'severity': severity,
+                'similar_symptoms': similar_symptoms[:3]  # Return top 3 similar
+            })
+        else:
+            return jsonify({'success': False, 'error': 'Failed to save symptoms'}), 500
+        
+    except Exception as e:
+        print(f"Save symptoms API error: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/api/ehr/symptoms')
+@login_required
+def api_get_symptoms():
+    """Get patient's symptom history"""
+    try:
+        user_id = request.user['id']
+        limit = request.args.get('limit', 20, type=int)
+        
+        symptoms = auth_db.get_patient_symptoms(user_id, limit)
+        
+        return jsonify({
+            'success': True,
+            'symptoms': symptoms,
+            'count': len(symptoms)
+        })
+        
+    except Exception as e:
+        print(f"Get symptoms API error: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/api/ehr/symptoms/similar', methods=['POST'])
+@login_required
+def api_find_similar_symptoms():
+    """Find similar symptoms in patient's history"""
+    try:
+        data = request.get_json()
+        user_id = request.user['id']
+        
+        current_symptoms = data.get('symptoms', '').strip()
+        threshold = data.get('threshold', 0.5)
+        
+        if not current_symptoms:
+            return jsonify({'success': False, 'error': 'Symptoms text is required'}), 400
+        
+        similar_symptoms = auth_db.find_similar_symptoms(user_id, current_symptoms, threshold)
+        
+        return jsonify({
+            'success': True,
+            'similar_symptoms': similar_symptoms,
+            'count': len(similar_symptoms)
+        })
+        
+    except Exception as e:
+        print(f"Find similar symptoms API error: {e}")
         return jsonify({'success': False, 'error': str(e)}), 500
 
 # SKIN ANALYZER ROUTES

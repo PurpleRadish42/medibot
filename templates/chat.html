@@ -828,6 +828,9 @@
                     <a href="/dashboard" style="color: white; text-decoration: none; padding: 0.5rem 1rem; border-radius: 10px; background: rgba(255,255,255,0.2); transition: all 0.3s ease;">
                         <i class="fas fa-home"></i> Dashboard
                     </a>
+                    <button onclick="showEHRModal()" style="color: white; background: rgba(40, 167, 69, 0.3); border: none; padding: 0.5rem 1rem; border-radius: 10px; cursor: pointer; transition: all 0.3s ease;">
+                        <i class="fas fa-notes-medical"></i> Health History
+                    </button>
                     <a href="/skin-analyzer" style="color: white; text-decoration: none; padding: 0.5rem 1rem; border-radius: 10px; background: rgba(79, 172, 254, 0.3); transition: all 0.3s ease;">
                         <i class="fas fa-camera-retro"></i> Skin Analyzer
                     </a>
@@ -1635,35 +1638,75 @@
         // Load chat history from database
         async function loadDatabaseChatHistory() {
             try {
-                console.log("📖 Loading conversations from database...");
+                console.log("📖 Loading chat history from database...");
                 
-                const response = await fetch('/api/conversations');
+                const response = await fetch('/api/chat-history');
                 if (!response.ok) {
-                    console.warn("❌ Failed to load conversations from database:", response.status);
+                    console.warn("❌ Failed to load chat history from database:", response.status);
                     return;
                 }
                 
                 const data = await response.json();
                 if (!data.success) {
-                    console.warn("❌ Conversations API returned error:", data.error);
+                    console.warn("❌ Chat history API returned error:", data.error);
                     return;
                 }
                 
-                console.log(`✅ Loaded ${data.conversations.length} conversations from database`);
+                console.log(`✅ Loaded ${data.history.length} messages from database`);
                 
-                // Convert conversations to chat sessions for sidebar
-                const chatSessions = convertConversationsToChatSessions(data.conversations);
+                // Convert history to chat sessions for sidebar
+                const chatSessions = convertHistoryToChatSessions(data.history);
                 console.log(`📋 Converted to ${chatSessions.length} chat sessions`);
                 
                 // Display in sidebar
                 displayChatSessions(chatSessions);
                 
             } catch (error) {
-                console.error("❌ Error loading database conversations:", error);
+                console.error("❌ Error loading database chat history:", error);
             }
         }
         
-        // Convert conversations API format to chat sessions
+        // Convert chat history API format to chat sessions
+        function convertHistoryToChatSessions(history) {
+            const sessions = [];
+            let sessionId = 1;
+            
+            // Group consecutive messages into sessions
+            // Each history entry has {message, response, timestamp}
+            for (let i = 0; i < history.length; i++) {
+                const entry = history[i];
+                
+                // Create a session for each message/response pair
+                const sessionTitle = `Chat ${sessionId}`;
+                const messages = [
+                    {
+                        content: entry.message,
+                        isUser: true,
+                        timestamp: entry.timestamp
+                    },
+                    {
+                        content: entry.response,
+                        isUser: false,
+                        timestamp: entry.timestamp
+                    }
+                ];
+                
+                sessions.push({
+                    id: `db-session-${sessionId}`,
+                    title: sessionTitle,
+                    messages: messages,
+                    date: entry.timestamp,
+                    source: 'database',
+                    messageCount: 2
+                });
+                
+                sessionId++;
+            }
+            
+            return sessions.reverse(); // Show newest first
+        }
+        
+        // Convert conversations API format to chat sessions (legacy)
         function convertConversationsToChatSessions(conversations) {
             const sessions = [];
             
@@ -2114,6 +2157,126 @@
             </div>
         </div>
     </div>
+
+    <!-- EHR Health History Modal -->
+    <div id="ehrModal" class="email-modal">
+        <div class="email-modal-content" style="max-width: 800px; height: 80vh;">
+            <button class="close-modal" onclick="closeEHRModal()">&times;</button>
+            <div class="modal-header">
+                <h2>🏥 Health History (EHR)</h2>
+                <p>Your symptom history and medical records</p>
+            </div>
+            <div style="max-height: 60vh; overflow-y: auto; padding: 1rem;">
+                <div id="ehrContent">
+                    <div style="text-align: center; padding: 2rem; color: #666;">
+                        <i class="fas fa-spinner fa-spin"></i> Loading health history...
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <style>
+        .ehr-symptom-item {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 10px;
+            padding: 1rem;
+            margin-bottom: 1rem;
+            border-left: 4px solid #28a745;
+        }
+        .ehr-symptom-date {
+            font-size: 0.9rem;
+            color: #888;
+            margin-bottom: 0.5rem;
+        }
+        .ehr-symptom-text {
+            font-size: 1rem;
+            margin-bottom: 0.5rem;
+        }
+        .ehr-symptom-keywords {
+            font-size: 0.8rem;
+            color: #4facfe;
+            background: rgba(79, 172, 254, 0.1);
+            padding: 0.2rem 0.5rem;
+            border-radius: 15px;
+            display: inline-block;
+        }
+        .ehr-symptom-severity {
+            float: right;
+            padding: 0.2rem 0.6rem;
+            border-radius: 15px;
+            font-size: 0.8rem;
+            font-weight: bold;
+        }
+        .severity-mild { background: rgba(40, 167, 69, 0.2); color: #28a745; }
+        .severity-moderate { background: rgba(255, 193, 7, 0.2); color: #ffc107; }
+        .severity-severe { background: rgba(220, 53, 69, 0.2); color: #dc3545; }
+    </style>
+
+    <script>
+        // EHR Modal Functions
+        async function showEHRModal() {
+            document.getElementById('ehrModal').style.display = 'flex';
+            await loadEHRHistory();
+        }
+
+        function closeEHRModal() {
+            document.getElementById('ehrModal').style.display = 'none';
+        }
+
+        async function loadEHRHistory() {
+            try {
+                const response = await fetch('/api/ehr/symptoms');
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}`);
+                }
+
+                const data = await response.json();
+                const ehrContent = document.getElementById('ehrContent');
+
+                if (data.success && data.symptoms.length > 0) {
+                    let html = `
+                        <div style="margin-bottom: 1rem;">
+                            <h3><i class="fas fa-chart-line"></i> Health Summary</h3>
+                            <p>Total records: <strong>${data.count}</strong></p>
+                        </div>
+                    `;
+
+                    data.symptoms.forEach(symptom => {
+                        const date = new Date(symptom.created_at).toLocaleDateString();
+                        const severityClass = `severity-${symptom.severity || 'mild'}`;
+                        
+                        html += `
+                            <div class="ehr-symptom-item">
+                                <div class="ehr-symptom-date">${date}</div>
+                                ${symptom.severity ? `<div class="ehr-symptom-severity ${severityClass}">${symptom.severity.toUpperCase()}</div>` : ''}
+                                <div class="ehr-symptom-text">${symptom.symptoms_text}</div>
+                                ${symptom.keywords ? `<div class="ehr-symptom-keywords"><i class="fas fa-tags"></i> ${symptom.keywords}</div>` : ''}
+                            </div>
+                        `;
+                    });
+
+                    ehrContent.innerHTML = html;
+                } else {
+                    ehrContent.innerHTML = `
+                        <div style="text-align: center; padding: 2rem; color: #666;">
+                            <i class="fas fa-notes-medical" style="font-size: 3rem; margin-bottom: 1rem; opacity: 0.3;"></i>
+                            <h3>No Health Records Found</h3>
+                            <p>Start a conversation about your symptoms to build your health history.</p>
+                        </div>
+                    `;
+                }
+            } catch (error) {
+                console.error('Error loading EHR history:', error);
+                document.getElementById('ehrContent').innerHTML = `
+                    <div style="text-align: center; padding: 2rem; color: #dc3545;">
+                        <i class="fas fa-exclamation-triangle"></i> Error loading health history
+                        <p style="margin-top: 0.5rem; font-size: 0.9rem;">${error.message}</p>
+                    </div>
+                `;
+            }
+        }
+    </script>
 
 </body>
 </html>
