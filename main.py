@@ -670,6 +670,83 @@ def api_clear_all_chats():
         print(f"Clear all chats error: {e}")
         return jsonify({'success': False, 'error': str(e)}), 500
 
+# SKIN ANALYZER ROUTES
+@app.route('/skin-analyzer')
+@login_required
+def skin_analyzer():
+    """Skin condition analyzer page"""
+    return render_template('skin_analyzer.html')
+
+@app.route('/api/v1/analyze-skin', methods=['POST'])
+@login_required
+def api_analyze_skin():
+    """API endpoint for skin condition analysis"""
+    try:
+        # Check if image file is present
+        if 'image' not in request.files:
+            return jsonify({
+                'success': False,
+                'message': 'No image file provided'
+            }), 400
+        
+        image_file = request.files['image']
+        
+        if image_file.filename == '':
+            return jsonify({
+                'success': False,
+                'message': 'No image file selected'
+            }), 400
+        
+        # Read image data
+        image_data = image_file.read()
+        
+        # Get user city from form data if provided
+        user_city = request.form.get('city', None)
+        
+        print(f"🔬 Analyzing skin image for user {request.user['id']}")
+        print(f"   Image size: {len(image_data)} bytes")
+        print(f"   User city: {user_city}")
+        
+        # Import and use skin analyzer
+        try:
+            from src.ai.skin_analyzer import analyze_skin_image
+            result = analyze_skin_image(image_data, user_city)
+            
+            if result['success']:
+                print(f"✅ Skin analysis completed successfully")
+                print(f"   Found {len(result['analysis']['conditions'])} potential conditions")
+                print(f"   Recommended specialist: {result['analysis']['specialist_type']}")
+                print(f"   Found {len(result['analysis']['doctors'])} doctors")
+                
+                return jsonify(result)
+            else:
+                print(f"❌ Skin analysis failed: {result.get('error', 'Unknown error')}")
+                return jsonify(result), 400
+                
+        except ImportError as e:
+            print(f"❌ Skin analyzer import error: {e}")
+            return jsonify({
+                'success': False,
+                'message': 'Skin analyzer not available'
+            }), 500
+        except Exception as e:
+            print(f"❌ Skin analysis error: {e}")
+            import traceback
+            traceback.print_exc()
+            return jsonify({
+                'success': False,
+                'message': f'Analysis failed: {str(e)}'
+            }), 500
+    
+    except Exception as e:
+        print(f"❌ API Error in /api/v1/analyze-skin: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({
+            'success': False,
+            'message': 'Internal server error'
+        }), 500
+
 def run_gradio():
     """Run Gradio in a separate thread"""
     if gradio_available:

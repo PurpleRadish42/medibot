@@ -1,0 +1,572 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Skin Condition Analyzer - MedBot AI</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            color: white;
+        }
+        
+        .container {
+            max-width: 1000px;
+            margin: 0 auto;
+            padding: 2rem;
+        }
+        
+        .header {
+            text-align: center;
+            margin-bottom: 2rem;
+        }
+        
+        .header h1 {
+            font-size: 2.5rem;
+            margin-bottom: 1rem;
+            background: linear-gradient(45deg, #4facfe, #00f2fe);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        
+        .header p {
+            font-size: 1.1rem;
+            opacity: 0.9;
+            margin-bottom: 1rem;
+        }
+        
+        .disclaimer {
+            background: rgba(255, 193, 7, 0.2);
+            border: 2px solid #ffc107;
+            border-radius: 10px;
+            padding: 1rem;
+            margin-bottom: 2rem;
+            text-align: center;
+        }
+        
+        .disclaimer i {
+            color: #ffc107;
+            margin-right: 0.5rem;
+        }
+        
+        .image-upload-section {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 15px;
+            padding: 2rem;
+            margin-bottom: 2rem;
+            backdrop-filter: blur(10px);
+        }
+        
+        .upload-options {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 2rem;
+            margin-bottom: 2rem;
+        }
+        
+        .upload-option {
+            text-align: center;
+            padding: 2rem;
+            border: 2px dashed rgba(255, 255, 255, 0.3);
+            border-radius: 10px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        
+        .upload-option:hover {
+            border-color: #4facfe;
+            background: rgba(79, 172, 254, 0.1);
+        }
+        
+        .upload-option.active {
+            border-color: #4facfe;
+            background: rgba(79, 172, 254, 0.2);
+        }
+        
+        .upload-option i {
+            font-size: 3rem;
+            color: #4facfe;
+            margin-bottom: 1rem;
+            display: block;
+        }
+        
+        .upload-option h3 {
+            margin-bottom: 0.5rem;
+        }
+        
+        #fileInput {
+            display: none;
+        }
+        
+        .camera-section {
+            display: none;
+            text-align: center;
+            margin-top: 2rem;
+        }
+        
+        #videoElement {
+            max-width: 100%;
+            border-radius: 10px;
+            margin-bottom: 1rem;
+        }
+        
+        .camera-controls {
+            display: flex;
+            gap: 1rem;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+        
+        .preview-section {
+            display: none;
+            text-align: center;
+            margin-top: 2rem;
+        }
+        
+        #imagePreview {
+            max-width: 100%;
+            max-height: 400px;
+            border-radius: 10px;
+            margin-bottom: 1rem;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+        }
+        
+        .image-controls {
+            display: flex;
+            gap: 1rem;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+        
+        .btn {
+            padding: 1rem 2rem;
+            border: none;
+            border-radius: 25px;
+            cursor: pointer;
+            font-size: 1rem;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        
+        .btn-primary {
+            background: linear-gradient(45deg, #4facfe, #00f2fe);
+            color: white;
+        }
+        
+        .btn-secondary {
+            background: rgba(255, 255, 255, 0.2);
+            color: white;
+            border: 1px solid rgba(255, 255, 255, 0.3);
+        }
+        
+        .btn-danger {
+            background: #ef4444;
+            color: white;
+        }
+        
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
+        }
+        
+        .btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+        
+        .loading {
+            display: none;
+            text-align: center;
+            margin: 2rem 0;
+        }
+        
+        .spinner {
+            border: 4px solid rgba(255, 255, 255, 0.3);
+            border-radius: 50%;
+            border-top: 4px solid #4facfe;
+            width: 50px;
+            height: 50px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 1rem;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        .results-section {
+            display: none;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 15px;
+            padding: 2rem;
+            margin-top: 2rem;
+            backdrop-filter: blur(10px);
+        }
+        
+        .results-title {
+            text-align: center;
+            margin-bottom: 2rem;
+            font-size: 1.5rem;
+            color: #4facfe;
+        }
+        
+        .condition-item {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 10px;
+            padding: 1rem;
+            margin-bottom: 1rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .condition-name {
+            font-weight: 600;
+            font-size: 1.1rem;
+        }
+        
+        .confidence-score {
+            background: #4facfe;
+            color: white;
+            padding: 0.3rem 0.8rem;
+            border-radius: 20px;
+            font-weight: 600;
+        }
+        
+        .specialist-recommendation {
+            background: rgba(40, 167, 69, 0.2);
+            border: 1px solid #28a745;
+            border-radius: 10px;
+            padding: 1.5rem;
+            margin: 2rem 0;
+            text-align: center;
+        }
+        
+        .doctor-list {
+            margin-top: 1rem;
+        }
+        
+        .doctor-item {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 8px;
+            padding: 1rem;
+            margin-bottom: 0.5rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .back-link {
+            position: absolute;
+            top: 2rem;
+            left: 2rem;
+            color: white;
+            text-decoration: none;
+            font-size: 1.1rem;
+        }
+        
+        .back-link:hover {
+            color: #4facfe;
+        }
+        
+        @media (max-width: 768px) {
+            .upload-options {
+                grid-template-columns: 1fr;
+            }
+            
+            .camera-controls,
+            .image-controls {
+                flex-direction: column;
+                align-items: center;
+            }
+            
+            .container {
+                padding: 1rem;
+            }
+            
+            .back-link {
+                position: static;
+                display: block;
+                text-align: center;
+                margin-bottom: 1rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <a href="/chat" class="back-link">
+        <i class="fas fa-arrow-left"></i> Back to Chat
+    </a>
+
+    <div class="container">
+        <div class="header">
+            <h1><i class="fas fa-camera-retro"></i> Skin Condition Analyzer</h1>
+            <p>Upload or capture an image of your skin condition for AI-powered analysis</p>
+        </div>
+
+        <div class="disclaimer">
+            <i class="fas fa-exclamation-triangle"></i>
+            <strong>Medical Disclaimer:</strong> This tool is for informational purposes only and does not replace professional medical advice. Always consult a qualified healthcare provider for accurate diagnosis and treatment.
+        </div>
+
+        <div class="image-upload-section">
+            <div class="upload-options">
+                <div class="upload-option" id="uploadOption" onclick="selectUploadOption()">
+                    <i class="fas fa-upload"></i>
+                    <h3>Upload from Device</h3>
+                    <p>Select an image file from your device</p>
+                </div>
+                
+                <div class="upload-option" id="cameraOption" onclick="selectCameraOption()">
+                    <i class="fas fa-camera"></i>
+                    <h3>Take a Photo</h3>
+                    <p>Use your camera to capture an image</p>
+                </div>
+            </div>
+
+            <input type="file" id="fileInput" accept=".jpg,.jpeg,.png" onchange="handleFileSelect(event)">
+
+            <div class="camera-section" id="cameraSection">
+                <video id="videoElement" width="400" height="300" autoplay></video>
+                <div class="camera-controls">
+                    <button class="btn btn-primary" onclick="capturePhoto()">
+                        <i class="fas fa-camera"></i> Capture Photo
+                    </button>
+                    <button class="btn btn-secondary" onclick="stopCamera()">
+                        <i class="fas fa-times"></i> Cancel
+                    </button>
+                </div>
+            </div>
+
+            <div class="preview-section" id="previewSection">
+                <img id="imagePreview" alt="Selected image">
+                <div class="image-controls">
+                    <button class="btn btn-primary" id="submitBtn" onclick="submitForAnalysis()">
+                        <i class="fas fa-brain"></i> Submit for Analysis
+                    </button>
+                    <button class="btn btn-secondary" onclick="removeImage()">
+                        <i class="fas fa-trash"></i> Remove Image
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <div class="loading" id="loadingSection">
+            <div class="spinner"></div>
+            <p>Analyzing your image... This may take a few moments.</p>
+        </div>
+
+        <div class="results-section" id="resultsSection">
+            <h2 class="results-title">Analysis Results</h2>
+            
+            <div id="conditionsList">
+                <!-- Conditions will be populated here -->
+            </div>
+
+            <div class="specialist-recommendation" id="specialistRecommendation">
+                <!-- Specialist recommendation will be populated here -->
+            </div>
+
+            <div class="disclaimer">
+                <i class="fas fa-info-circle"></i>
+                <strong>Remember:</strong> This is not a medical diagnosis. Please consult a qualified medical professional for an accurate diagnosis and treatment plan.
+            </div>
+
+            <div style="text-align: center; margin-top: 2rem;">
+                <button class="btn btn-primary" onclick="analyzeAnother()">
+                    <i class="fas fa-plus"></i> Analyze Another Image
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let currentStream = null;
+        let selectedImage = null;
+
+        function selectUploadOption() {
+            document.getElementById('uploadOption').classList.add('active');
+            document.getElementById('cameraOption').classList.remove('active');
+            document.getElementById('cameraSection').style.display = 'none';
+            document.getElementById('fileInput').click();
+        }
+
+        function selectCameraOption() {
+            document.getElementById('cameraOption').classList.add('active');
+            document.getElementById('uploadOption').classList.remove('active');
+            startCamera();
+        }
+
+        async function startCamera() {
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ 
+                    video: { width: 400, height: 300 } 
+                });
+                currentStream = stream;
+                document.getElementById('videoElement').srcObject = stream;
+                document.getElementById('cameraSection').style.display = 'block';
+                document.getElementById('previewSection').style.display = 'none';
+            } catch (error) {
+                alert('Camera access denied or not available. Please try uploading an image instead.');
+                console.error('Camera error:', error);
+            }
+        }
+
+        function stopCamera() {
+            if (currentStream) {
+                currentStream.getTracks().forEach(track => track.stop());
+                currentStream = null;
+            }
+            document.getElementById('cameraSection').style.display = 'none';
+            document.getElementById('cameraOption').classList.remove('active');
+        }
+
+        function capturePhoto() {
+            const video = document.getElementById('videoElement');
+            const canvas = document.createElement('canvas');
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+            
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(video, 0, 0);
+            
+            canvas.toBlob(function(blob) {
+                selectedImage = blob;
+                displayPreview(canvas.toDataURL());
+                stopCamera();
+            }, 'image/jpeg', 0.8);
+        }
+
+        function handleFileSelect(event) {
+            const file = event.target.files[0];
+            if (file) {
+                if (file.size > 10 * 1024 * 1024) { // 10MB limit
+                    alert('File size too large. Please select an image under 10MB.');
+                    return;
+                }
+                
+                selectedImage = file;
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    displayPreview(e.target.result);
+                };
+                reader.readAsDataURL(file);
+            }
+        }
+
+        function displayPreview(imageSrc) {
+            document.getElementById('imagePreview').src = imageSrc;
+            document.getElementById('previewSection').style.display = 'block';
+            document.getElementById('resultsSection').style.display = 'none';
+        }
+
+        function removeImage() {
+            selectedImage = null;
+            document.getElementById('previewSection').style.display = 'none';
+            document.getElementById('uploadOption').classList.remove('active');
+            document.getElementById('cameraOption').classList.remove('active');
+            document.getElementById('fileInput').value = '';
+        }
+
+        async function submitForAnalysis() {
+            if (!selectedImage) {
+                alert('Please select an image first.');
+                return;
+            }
+
+            document.getElementById('loadingSection').style.display = 'block';
+            document.getElementById('previewSection').style.display = 'none';
+            document.getElementById('resultsSection').style.display = 'none';
+
+            const formData = new FormData();
+            formData.append('image', selectedImage);
+
+            try {
+                const response = await fetch('/api/v1/analyze-skin', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    displayResults(data.analysis);
+                } else {
+                    alert('Analysis failed: ' + (data.message || 'Unknown error'));
+                }
+            } catch (error) {
+                console.error('Analysis error:', error);
+                alert('Network error. Please check your connection and try again.');
+            } finally {
+                document.getElementById('loadingSection').style.display = 'none';
+            }
+        }
+
+        function displayResults(analysis) {
+            const conditionsList = document.getElementById('conditionsList');
+            const specialistRecommendation = document.getElementById('specialistRecommendation');
+
+            // Display conditions
+            conditionsList.innerHTML = '';
+            analysis.conditions.forEach(condition => {
+                const conditionDiv = document.createElement('div');
+                conditionDiv.className = 'condition-item';
+                conditionDiv.innerHTML = `
+                    <div class="condition-name">${condition.name}</div>
+                    <div class="confidence-score">${condition.confidence}%</div>
+                `;
+                conditionsList.appendChild(conditionDiv);
+            });
+
+            // Display specialist recommendation
+            specialistRecommendation.innerHTML = `
+                <h3><i class="fas fa-user-md"></i> Recommended Specialist</h3>
+                <p><strong>${analysis.specialist_type}</strong></p>
+                <p>Based on the analysis, we recommend consulting with a ${analysis.specialist_type.toLowerCase()}.</p>
+                ${analysis.doctors && analysis.doctors.length > 0 ? `
+                    <div class="doctor-list">
+                        <h4>Available Doctors:</h4>
+                        ${analysis.doctors.map(doctor => `
+                            <div class="doctor-item">
+                                <div>
+                                    <strong>${doctor.name}</strong><br>
+                                    <small>${doctor.city} - ${doctor.specialty}</small>
+                                </div>
+                                <div>${doctor.rating || 'N/A'}</div>
+                            </div>
+                        `).join('')}
+                    </div>
+                ` : ''}
+            `;
+
+            document.getElementById('resultsSection').style.display = 'block';
+        }
+
+        function analyzeAnother() {
+            document.getElementById('resultsSection').style.display = 'none';
+            removeImage();
+        }
+
+        // Reset options on page load
+        document.addEventListener('DOMContentLoaded', function() {
+            removeImage();
+        });
+    </script>
+</body>
+</html>
