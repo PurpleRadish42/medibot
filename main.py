@@ -825,6 +825,12 @@ def specialist_finder():
     """Location-aware specialist finder page"""
     return render_template('specialist_finder.html')
 
+# TEST ROUTE: Specialist finder without authentication (for demo purposes)
+@app.route('/demo/specialist-finder')
+def demo_specialist_finder():
+    """Demo version of specialist finder without authentication"""
+    return render_template('specialist_finder_demo.html')
+
 # NEW ROUTE: Core location-aware specialist recommendation API
 @app.route('/api/v1/recommend-specialists', methods=['POST'])
 @login_required
@@ -921,6 +927,107 @@ def api_recommend_specialists():
             
     except Exception as e:
         print(f"❌ API Error in /api/v1/recommend-specialists: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({
+            'error': 'Internal server error',
+            'success': False
+        }), 500
+
+# DEMO ROUTE: Specialist recommendation API without authentication (for demo purposes)
+@app.route('/demo/api/v1/recommend-specialists', methods=['POST'])
+def demo_api_recommend_specialists():
+    """
+    Demo version of specialist recommendation endpoint without authentication.
+    """
+    try:
+        data = request.get_json()
+        specialist_type = data.get('specialist_type', '').strip()
+        user_lat = data.get('latitude')
+        user_lon = data.get('longitude')
+        city = data.get('city', '').strip() if data.get('city') else None
+        limit = int(data.get('limit', 10))
+        sort_by = data.get('sort_by', 'distance')  # 'distance' or 'rating'
+        
+        if not specialist_type:
+            return jsonify({
+                'error': 'specialist_type is required',
+                'success': False
+            }), 400
+        
+        # Validate coordinates if provided
+        if user_lat is not None and user_lon is not None:
+            try:
+                user_lat = float(user_lat)
+                user_lon = float(user_lon)
+                # Basic coordinate validation
+                if not (-90 <= user_lat <= 90 and -180 <= user_lon <= 180):
+                    return jsonify({
+                        'error': 'Invalid coordinates provided',
+                        'success': False
+                    }), 400
+            except (ValueError, TypeError):
+                return jsonify({
+                    'error': 'Invalid coordinate format',
+                    'success': False
+                }), 400
+        
+        print(f"🏥 Demo specialist recommendation request:")
+        print(f"   Specialist: {specialist_type}")
+        print(f"   Location: {user_lat}, {user_lon}" if user_lat and user_lon else "   Location: Not provided")
+        print(f"   City: {city}" if city else "   City: Not specified")
+        print(f"   Sort by: {sort_by}")
+        
+        # Use the doctor recommender
+        try:
+            from doctor_recommender import DoctorRecommender
+            doctor_recommender = DoctorRecommender()
+            
+            # Get location-aware recommendations
+            if user_lat and user_lon:
+                recommendations = doctor_recommender.recommend_doctors_with_location(
+                    specialist_type=specialist_type,
+                    user_lat=user_lat,
+                    user_lon=user_lon,
+                    city=city,
+                    limit=limit,
+                    sort_by=sort_by
+                )
+            else:
+                # Fallback to basic recommendations without location
+                recommendations = doctor_recommender.recommend_doctors(
+                    specialist_type=specialist_type,
+                    city=city,
+                    limit=limit
+                )
+                # Add default distance info for non-location recommendations
+                for rec in recommendations:
+                    rec['distance'] = None
+                    rec['distance_str'] = "Location not available"
+                    rec['rating'] = 0.0
+            
+            return jsonify({
+                'success': True,
+                'specialist_type': specialist_type,
+                'location_provided': user_lat is not None and user_lon is not None,
+                'city_filter': city,
+                'sort_by': sort_by,
+                'total_found': len(recommendations),
+                'recommendations': recommendations
+            })
+            
+        except Exception as e:
+            print(f"❌ Error in demo doctor recommendation: {e}")
+            import traceback
+            traceback.print_exc()
+            return jsonify({
+                'error': 'Failed to get doctor recommendations',
+                'success': False,
+                'details': str(e)
+            }), 500
+            
+    except Exception as e:
+        print(f"❌ API Error in /demo/api/v1/recommend-specialists: {e}")
         import traceback
         traceback.print_exc()
         return jsonify({
