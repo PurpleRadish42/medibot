@@ -113,6 +113,27 @@ class MedibotAuthDatabase:
             """)
             print("✅ Chat history table created/verified")
             
+            # Create patient_symptoms table for EHR system
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS patient_symptoms (
+                    id INT AUTO_INCREMENT PRIMARY KEY,
+                    user_id INT NOT NULL,
+                    conversation_id VARCHAR(36),
+                    symptoms_text TEXT NOT NULL,
+                    keywords VARCHAR(500),
+                    severity VARCHAR(20),
+                    category VARCHAR(100),
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+                    INDEX idx_user_symptoms (user_id),
+                    INDEX idx_created_at (created_at),
+                    INDEX idx_category (category),
+                    FULLTEXT KEY idx_symptoms_text (symptoms_text),
+                    FULLTEXT KEY idx_keywords (keywords)
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+            """)
+            print("✅ Patient symptoms table created/verified")
+            
             conn.commit()
             conn.close()
             print("✅ medibot2 database initialized successfully")
@@ -539,6 +560,134 @@ class MedibotAuthDatabase:
         except Exception as e:
             print(f"Get chat history error: {e}")
             return []
+
+    # EHR (Electronic Health Record) Methods
+    def save_patient_symptoms(self, user_id, conversation_id, symptoms_text, keywords=None, severity=None, category=None):
+        """Save patient symptoms to EHR system"""
+        try:
+            conn = self.get_connection()
+            cursor = conn.cursor()
+            
+            cursor.execute("""
+                INSERT INTO patient_symptoms 
+                (user_id, conversation_id, symptoms_text, keywords, severity, category)
+                VALUES (%s, %s, %s, %s, %s, %s)
+            """, (user_id, conversation_id, symptoms_text, keywords, severity, category))
+            
+            conn.commit()
+            symptom_id = cursor.lastrowid
+            conn.close()
+            
+            print(f"✅ Symptoms saved for user {user_id}: {symptoms_text[:50]}...")
+            return symptom_id
+            
+        except Exception as e:
+            print(f"Save symptoms error: {e}")
+            return None
+
+    def get_patient_symptoms(self, user_id, limit=50):
+        """Get patient's historical symptoms"""
+        try:
+            conn = self.get_connection()
+            cursor = conn.cursor()
+            
+            cursor.execute("""
+                SELECT id, symptoms_text, keywords, severity, category, created_at, conversation_id
+                FROM patient_symptoms
+                WHERE user_id = %s
+                ORDER BY created_at DESC
+                LIMIT %s
+            """, (user_id, limit))
+            
+            symptoms = []
+            for row in cursor.fetchall():
+                symptoms.append({
+                    'id': row[0],
+                    'symptoms_text': row[1],
+                    'keywords': row[2],
+                    'severity': row[3],
+                    'category': row[4],
+                    'created_at': row[5],
+                    'conversation_id': row[6]
+                })
+            
+            conn.close()
+            return symptoms
+            
+        except Exception as e:
+            print(f"Get symptoms error: {e}")
+            return []
+
+    def find_similar_symptoms(self, user_id, current_symptoms, similarity_threshold=0.5):
+        """Find similar symptoms in patient's history using text matching"""
+        try:
+            import re
+            from difflib import SequenceMatcher
+            
+            # Get all historical symptoms
+            historical_symptoms = self.get_patient_symptoms(user_id)
+            
+            # Clean and prepare current symptoms for comparison
+            current_clean = re.sub(r'[^\w\s]', '', current_symptoms.lower())
+            current_words = set(current_clean.split())
+            
+            similar_symptoms = []
+            
+            for symptom in historical_symptoms:
+                # Clean historical symptoms
+                historical_clean = re.sub(r'[^\w\s]', '', symptom['symptoms_text'].lower())
+                historical_words = set(historical_clean.split())
+                
+                # Calculate word overlap
+                word_overlap = len(current_words.intersection(historical_words)) / max(len(current_words), len(historical_words))
+                
+                # Calculate sequence similarity
+                sequence_similarity = SequenceMatcher(None, current_clean, historical_clean).ratio()
+                
+                # Combined similarity score
+                similarity_score = (word_overlap + sequence_similarity) / 2
+                
+                if similarity_score >= similarity_threshold:
+                    symptom['similarity_score'] = similarity_score
+                    similar_symptoms.append(symptom)
+            
+            # Sort by similarity score (highest first)
+            similar_symptoms.sort(key=lambda x: x['similarity_score'], reverse=True)
+            
+            return similar_symptoms
+            
+        except Exception as e:
+            print(f"Find similar symptoms error: {e}")
+            return []
+
+    def extract_symptom_keywords(self, symptoms_text):
+        """Extract key symptom words from text"""
+        try:
+            import re
+            
+            # Common medical symptom keywords
+            medical_keywords = [
+                'headache', 'fever', 'cough', 'cold', 'pain', 'ache', 'sore', 'throat',
+                'stomach', 'nausea', 'vomit', 'diarrhea', 'constipation', 'fatigue', 'tired',
+                'dizzy', 'weak', 'swelling', 'rash', 'itch', 'burn', 'bleeding', 'bruise',
+                'chest', 'heart', 'breath', 'shortness', 'difficulty', 'muscle', 'joint',
+                'back', 'neck', 'shoulder', 'knee', 'ankle', 'wrist', 'elbow', 'hip',
+                'eye', 'ear', 'nose', 'mouth', 'tooth', 'gum', 'tongue', 'lip',
+                'skin', 'hair', 'nail', 'foot', 'hand', 'arm', 'leg', 'finger', 'toe'
+            ]
+            
+            # Clean text and extract words
+            clean_text = re.sub(r'[^\w\s]', '', symptoms_text.lower())
+            words = clean_text.split()
+            
+            # Find matching keywords
+            keywords = [word for word in words if word in medical_keywords]
+            
+            return ', '.join(set(keywords))  # Remove duplicates and join
+            
+        except Exception as e:
+            print(f"Extract keywords error: {e}")
+            return ""
 
 
 # Test the database functionality
