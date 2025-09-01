@@ -29,7 +29,15 @@ class MedibotAuthDatabase:
             'charset': 'utf8mb4',
             'autocommit': False
         }
-        self.init_database()
+        self.db_available = False
+        try:
+            self.init_database()
+            self.db_available = True
+            print("✅ Database initialized successfully")
+        except Exception as e:
+            print(f"⚠️  Database initialization failed: {e}")
+            print("📋 Application will start with limited functionality")
+            self.db_available = False
     
     def get_connection(self):
         """Get a MySQL database connection"""
@@ -537,6 +545,10 @@ class MedibotAuthDatabase:
     
     def get_chat_history(self, user_id, limit=50):
         """Get user's recent chat history"""
+        if not self.db_available:
+            print("⚠️  Database not available, returning empty chat history")
+            return []
+            
         try:
             conn = self.get_connection()
             cursor = conn.cursor()
@@ -574,6 +586,10 @@ class MedibotAuthDatabase:
     # EHR (Electronic Health Record) Methods
     def save_patient_symptoms(self, user_id, conversation_id, symptoms_text, keywords=None, severity=None, category=None):
         """Save patient symptoms to EHR system"""
+        if not self.db_available:
+            print("⚠️  Database not available, cannot save symptoms")
+            return None
+            
         try:
             conn = self.get_connection()
             cursor = conn.cursor()
@@ -597,6 +613,10 @@ class MedibotAuthDatabase:
 
     def get_patient_symptoms(self, user_id, limit=50):
         """Get patient's historical symptoms"""
+        if not self.db_available:
+            print("⚠️  Database not available, returning empty symptoms list")
+            return []
+            
         try:
             conn = self.get_connection()
             cursor = conn.cursor()
@@ -675,17 +695,21 @@ class MedibotAuthDatabase:
         try:
             import re
             
-            # Common medical symptom keywords
+            # Common medical symptom keywords (including both singular and plural forms)
             medical_keywords = [
-                'headache', 'fever', 'cough', 'cold', 'pain', 'ache', 'sore', 'throat',
-                'stomach', 'nausea', 'vomit', 'diarrhea', 'constipation', 'fatigue', 'tired',
-                'dizzy', 'weak', 'swelling', 'rash', 'itch', 'burn', 'bleeding', 'bruise',
-                'chest', 'heart', 'breath', 'shortness', 'difficulty', 'muscle', 'joint',
-                'back', 'neck', 'shoulder', 'knee', 'ankle', 'wrist', 'elbow', 'hip',
-                'eye', 'ear', 'nose', 'mouth', 'tooth', 'gum', 'tongue', 'lip',
-                'skin', 'hair', 'nail', 'foot', 'hand', 'arm', 'leg', 'finger', 'toe',
-                'sick', 'ill', 'hurt', 'feel', 'problem', 'issue', 'uncomfortable',
-                'tender', 'swollen', 'inflammation', 'infection', 'allergy', 'sensitive'
+                'headache', 'headaches', 'fever', 'cough', 'cold', 'pain', 'ache', 'aches', 'sore', 'throat',
+                'stomach', 'nausea', 'nauseous', 'vomit', 'vomiting', 'diarrhea', 'constipation', 
+                'fatigue', 'tired', 'dizzy', 'weak', 'weakness', 'swelling', 'swollen', 'rash', 
+                'itch', 'itchy', 'burn', 'burning', 'bleeding', 'bruise', 'bruises',
+                'chest', 'heart', 'breath', 'breathing', 'shortness', 'difficulty', 'muscle', 'muscles',
+                'joint', 'joints', 'back', 'neck', 'shoulder', 'shoulders', 'knee', 'knees', 
+                'ankle', 'ankles', 'wrist', 'wrists', 'elbow', 'elbows', 'hip', 'hips',
+                'eye', 'eyes', 'ear', 'ears', 'nose', 'mouth', 'tooth', 'teeth', 'gum', 'gums',
+                'tongue', 'lip', 'lips', 'skin', 'hair', 'nail', 'nails', 'foot', 'feet',
+                'hand', 'hands', 'arm', 'arms', 'leg', 'legs', 'finger', 'fingers', 'toe', 'toes',
+                'sick', 'ill', 'hurt', 'hurts', 'hurting', 'feel', 'feeling', 'problem', 'problems',
+                'issue', 'issues', 'uncomfortable', 'tender', 'inflammation', 'infected', 'infection',
+                'allergy', 'allergic', 'sensitive', 'sensitivity', 'migraine', 'migraines'
             ]
             
             # Clean text and extract words
