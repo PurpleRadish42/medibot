@@ -7,6 +7,19 @@ from pathlib import Path
 from typing import List, Dict, Optional
 import logging
 from markupsafe import Markup
+import sys
+import os
+
+# Add src to path for geolocation utils
+src_path = Path(__file__).parent / "src"
+sys.path.insert(0, str(src_path))
+
+try:
+    from utils.geolocation import haversine_distance, get_city_coordinates, parse_coordinates
+    GEOLOCATION_AVAILABLE = True
+except ImportError:
+    print("⚠ Geolocation utilities not available")
+    GEOLOCATION_AVAILABLE = False
 
 class DoctorRecommender:
     def __init__(self, csv_path: str = "cleaned_doctors_full.csv"):
@@ -194,6 +207,139 @@ class DoctorRecommender:
             
         except Exception as e:
             print(f"❌ Error in doctor recommendation: {e}")
+            import traceback
+            traceback.print_exc()
+            return []
+
+    def recommend_doctors_with_location(self, specialist_type: str, user_lat: float = None, 
+                                       user_lon: float = None, city: str = None, 
+                                       limit: int = 10, sort_by: str = 'distance') -> List[Dict]:
+        """
+        Recommend doctors based on specialist type with location-aware sorting.
+        
+        Args:
+            specialist_type: Type of specialist to find
+            user_lat: User's latitude 
+            user_lon: User's longitude
+            city: City filter (optional)
+            limit: Maximum number of results
+            sort_by: 'distance' or 'rating' for sorting preference
+            
+        Returns:
+            List of doctor recommendations with distance information
+        """
+        if self.doctors_df is None:
+            print("❌ No doctor data loaded")
+            return []
+        
+        if not GEOLOCATION_AVAILABLE:
+            print("⚠ Geolocation not available, falling back to basic recommendation")
+            return self.recommend_doctors(specialist_type, city, limit)
+        
+        try:
+            print(f"\n🏥 Location-aware search for {specialist_type}")
+            if user_lat and user_lon:
+                print(f"📍 User location: {user_lat:.4f}, {user_lon:.4f}")
+            
+            # Find exact matching specialty
+            exact_specialty = self.find_specialty_match(specialist_type)
+            
+            if not exact_specialty:
+                print("❌ No matching specialty found")
+                return []
+            
+            # Filter doctors by exact specialty match
+            filtered_doctors = self.doctors_df[
+                self.doctors_df['speciality'] == exact_specialty
+            ].copy()
+            
+            print(f"🔍 Found {len(filtered_doctors)} {exact_specialty}s in database")
+            
+            # Filter by city if provided
+            if city and len(filtered_doctors) > 0:
+                city_filtered = filtered_doctors[
+                    filtered_doctors['city'].str.contains(city, case=False, na=False)
+                ]
+                
+                if len(city_filtered) > 0:
+                    filtered_doctors = city_filtered
+                    print(f"🏙️ Filtered to {len(filtered_doctors)} doctors in {city}")
+                else:
+                    print(f"⚠️ No {exact_specialty}s found in {city}, showing all locations")
+            
+            if len(filtered_doctors) == 0:
+                print("❌ No doctors found after filtering")
+                return []
+            
+            # Calculate distances if user location provided
+            if user_lat and user_lon:
+                distances = []
+                for _, doctor in filtered_doctors.iterrows():
+                    doc_lat, doc_lon = get_city_coordinates(doctor['city'])
+                    if doc_lat and doc_lon:
+                        distance = haversine_distance(user_lat, user_lon, doc_lat, doc_lon)
+                        distances.append(distance)
+                    else:
+                        distances.append(float('inf'))  # Unknown distance
+                
+                filtered_doctors['distance'] = distances
+                print(f"📏 Calculated distances for {len(filtered_doctors)} doctors")
+            else:
+                filtered_doctors['distance'] = float('inf')
+            
+            # Prepare scores for sorting
+            filtered_doctors['dp_score'] = filtered_doctors['dp_score'].fillna(0)
+            
+            # Sort based on preference
+            if sort_by == 'distance' and user_lat and user_lon:
+                # Sort by distance first, then by rating
+                filtered_doctors = filtered_doctors.sort_values([
+                    'distance', 'dp_score'
+                ], ascending=[True, False])
+                print(f"📊 Sorted by distance (closest first)")
+            else:
+                # Sort by rating first, then by distance
+                filtered_doctors = filtered_doctors.sort_values([
+                    'dp_score', 'distance'
+                ], ascending=[False, True])
+                print(f"📊 Sorted by rating (highest first)")
+            
+            # Get top recommendations
+            top_doctors = filtered_doctors.head(limit)
+            print(f"👨‍⚕️ Returning top {len(top_doctors)} {exact_specialty}s")
+            
+            # Format recommendations
+            recommendations = []
+            for _, doctor in top_doctors.iterrows():
+                dp_score = doctor.get('dp_score', 0)
+                distance = doctor.get('distance', float('inf'))
+                
+                # Format distance
+                if distance == float('inf'):
+                    distance_str = "Distance unknown"
+                elif distance < 1:
+                    distance_str = f"{distance*1000:.0f}m away"
+                else:
+                    distance_str = f"{distance:.1f}km away"
+                
+                recommendations.append({
+                    'name': str(doctor['name']),
+                    'specialty': str(doctor['speciality']),
+                    'degree': str(doctor.get('degree', 'Not specified')),
+                    'city': str(doctor['city']),
+                    'location': str(doctor.get('location', 'Location not specified')),
+                    'dp_score': f"{dp_score:.0f}" if pd.notna(dp_score) and dp_score > 0 else 'Not rated',
+                    'rating': float(dp_score) if pd.notna(dp_score) else 0.0,
+                    'distance': distance if distance != float('inf') else None,
+                    'distance_str': distance_str,
+                    'profile_url': str(doctor.get('profile_url', '')),
+                    'google_map_link': str(doctor.get('google_map_link', ''))
+                })
+            
+            return recommendations
+            
+        except Exception as e:
+            print(f"❌ Error in recommend_doctors_with_location: {e}")
             import traceback
             traceback.print_exc()
             return []
