@@ -541,18 +541,28 @@ class MedibotAuthDatabase:
             conn = self.get_connection()
             cursor = conn.cursor()
             
+            # Get user messages paired with their responses
             cursor.execute("""
-                SELECT message, response, timestamp
-                FROM chat_history
-                WHERE user_id = %s AND message_type = 'user'
-                ORDER BY timestamp DESC
+                SELECT 
+                    u.message as user_message,
+                    a.message as assistant_response,
+                    u.timestamp,
+                    u.conversation_id
+                FROM chat_history u
+                LEFT JOIN chat_history a ON (
+                    u.conversation_id = a.conversation_id 
+                    AND u.message_order + 1 = a.message_order 
+                    AND a.message_type = 'assistant'
+                )
+                WHERE u.user_id = %s AND u.message_type = 'user'
+                ORDER BY u.timestamp DESC
                 LIMIT %s
             """, (user_id, limit))
             
             history = []
             for row in cursor.fetchall():
-                message, response, timestamp = row
-                history.append((message, response, timestamp))
+                user_message, assistant_response, timestamp, conversation_id = row
+                history.append((user_message, assistant_response or "No response", timestamp))
             
             conn.close()
             return history
@@ -673,15 +683,26 @@ class MedibotAuthDatabase:
                 'chest', 'heart', 'breath', 'shortness', 'difficulty', 'muscle', 'joint',
                 'back', 'neck', 'shoulder', 'knee', 'ankle', 'wrist', 'elbow', 'hip',
                 'eye', 'ear', 'nose', 'mouth', 'tooth', 'gum', 'tongue', 'lip',
-                'skin', 'hair', 'nail', 'foot', 'hand', 'arm', 'leg', 'finger', 'toe'
+                'skin', 'hair', 'nail', 'foot', 'hand', 'arm', 'leg', 'finger', 'toe',
+                'sick', 'ill', 'hurt', 'feel', 'problem', 'issue', 'uncomfortable',
+                'tender', 'swollen', 'inflammation', 'infection', 'allergy', 'sensitive'
             ]
             
             # Clean text and extract words
             clean_text = re.sub(r'[^\w\s]', '', symptoms_text.lower())
             words = clean_text.split()
             
-            # Find matching keywords
-            keywords = [word for word in words if word in medical_keywords]
+            # Find matching keywords - exact matches only to avoid false positives
+            keywords = []
+            for word in words:
+                if word in medical_keywords:
+                    keywords.append(word)
+            
+            # Also check for common symptom phrases
+            symptom_phrases = ['feel sick', 'feel bad', 'not well', 'under weather', 'feel terrible']
+            for phrase in symptom_phrases:
+                if phrase in clean_text:
+                    keywords.append(phrase.replace(' ', '_'))
             
             return ', '.join(set(keywords))  # Remove duplicates and join
             
