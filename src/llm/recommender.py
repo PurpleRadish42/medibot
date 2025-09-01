@@ -138,8 +138,39 @@ class MedicalRecommender:
         
         return messages
     
-    def get_doctor_recommendations(self, specialist_type: str, user_city: str = None) -> str:
-        """Get doctor recommendations from CSV database"""
+    def check_user_wants_doctors(self, message: str) -> bool:
+        """Check if user wants to see doctor recommendations"""
+        positive_indicators = [
+            "yes", "yeah", "sure", "okay", "ok", "please", "show", "list", "doctors", 
+            "i would like", "i want", "help me find", "recommend"
+        ]
+        return any(indicator in message.lower() for indicator in positive_indicators)
+    
+    def extract_doctor_preference(self, message: str) -> str:
+        """Extract user preference for doctor filtering"""
+        message_lower = message.lower()
+        
+        # Check for location-based preference
+        location_indicators = [
+            "location", "near me", "nearby", "close", "city", "area", "local", 
+            "distance", "proximity", "closest"
+        ]
+        
+        # Check for rating-based preference  
+        rating_indicators = [
+            "rating", "ratings", "score", "best", "top rated", "highly rated",
+            "reputation", "quality", "experienced", "experience"
+        ]
+        
+        if any(indicator in message_lower for indicator in location_indicators):
+            return "location"
+        elif any(indicator in message_lower for indicator in rating_indicators):
+            return "rating"
+        else:
+            return "unknown"
+
+    def get_doctor_recommendations(self, specialist_type: str, user_city: str = None, sort_by: str = "rating") -> str:
+        """Get doctor recommendations from CSV database with sorting preference"""
         if not self.doctor_recommender:
             return f"Please schedule an appointment with a {specialist_type} for proper evaluation and treatment."
         
@@ -148,7 +179,8 @@ class MedicalRecommender:
             doctors = self.doctor_recommender.recommend_doctors(
                 specialist_type=specialist_type,
                 city=user_city,
-                limit=5
+                limit=5,
+                sort_by=sort_by
             )
             
             # Format the recommendations
@@ -163,16 +195,29 @@ class MedicalRecommender:
         state = {
             "message_count": len(history),
             "symptoms_gathered": [],
-            "recommendation_made": False
+            "recommendation_made": False,
+            "doctors_prompt_sent": False,
+            "awaiting_doctor_preference": False,
+            "last_specialist": None
         }
         
         # Check if a recommendation was already made in the history
         for user_msg, assistant_msg in history:
             if assistant_msg:
                 # Check if this message contains a specialist recommendation
-                if self.extract_specialist_recommendation(assistant_msg):
+                specialist = self.extract_specialist_recommendation(assistant_msg)
+                if specialist:
                     state["recommendation_made"] = True
-                    break
+                    state["last_specialist"] = specialist
+                
+                # Check if we asked about doctor recommendations
+                if "would you like me to show you a list of qualified doctors" in assistant_msg.lower():
+                    state["doctors_prompt_sent"] = True
+                    state["awaiting_doctor_preference"] = True
+                
+                # Check if we're waiting for location/rating preference
+                if "would you prefer doctors sorted by" in assistant_msg.lower():
+                    state["awaiting_doctor_preference"] = True
                 
                 # Look for symptoms mentioned
                 symptom_keywords = [
@@ -186,12 +231,42 @@ class MedicalRecommender:
         return state
     
     def generate_response(self, history: List[Tuple[str, str]], message: str, user_city: str = None) -> str:
-        """Generate a response using OpenAI API with doctor recommendations"""
+        """Generate a response using OpenAI API with interactive doctor recommendations"""
         try:
             # Analyze current conversation state from history
             conversation_state = self.analyze_conversation_state(history)
             
             logger.info(f"Conversation state: {conversation_state}")
+            
+            # Check if user is responding to doctor recommendations prompt
+            if conversation_state["awaiting_doctor_preference"]:
+                if conversation_state["doctors_prompt_sent"] and not self.check_user_wants_doctors(message):
+                    # User doesn't want doctors, provide general advice
+                    return f"That's perfectly fine! I recommend scheduling an appointment with a {conversation_state['last_specialist']} when convenient for you. In the meantime, if you have any other health concerns or questions, feel free to ask."
+                
+                elif conversation_state["doctors_prompt_sent"] and self.check_user_wants_doctors(message):
+                    # User wants doctors, ask for preference
+                    return "Great! I can help you find qualified doctors. Would you prefer doctors sorted by:\n\n1. **Location** - Doctors nearest to your area\n2. **Ratings** - Highest rated and most experienced doctors\n\nPlease let me know your preference!"
+                
+                elif "would you prefer doctors sorted by" in history[-1][1].lower() if history else False:
+                    # User is responding to sorting preference
+                    preference = self.extract_doctor_preference(message)
+                    specialist_type = conversation_state["last_specialist"]
+                    
+                    if preference == "unknown":
+                        return "I didn't quite understand your preference. Would you like doctors sorted by **location** (nearest to you) or by **ratings** (highest rated)? Please let me know!"
+                    
+                    # Get and return doctor recommendations based on preference
+                    doctor_recommendations = self.get_doctor_recommendations(
+                        specialist_type, 
+                        user_city if preference == "location" else None, 
+                        sort_by=preference
+                    )
+                    
+                    sort_description = "nearest to your location" if preference == "location" else "highest ratings and experience"
+                    response_prefix = f"Here are the top {specialist_type}s sorted by {sort_description}:\n\n"
+                    
+                    return response_prefix + doctor_recommendations
             
             # Check if this is a medical query
             if not self.is_medical_query(message) and len(history) > 0:
@@ -216,7 +291,7 @@ class MedicalRecommender:
                     "role": "system", 
                     "content": "You have gathered enough information. Now provide a clear recommendation for which ONE specialist the patient should see based on their symptoms. End your response with: 'SPECIALIST_RECOMMENDATION: [SPECIALIST_TYPE]'"
                 })
-            elif conversation_state["recommendation_made"]:
+            elif conversation_state["recommendation_made"] and not conversation_state["doctors_prompt_sent"]:
                 messages.append({
                     "role": "system",
                     "content": "You have already made a specialist recommendation. Continue to be helpful by answering any follow-up questions about the recommendation or offering additional guidance about preparing for the specialist visit."
@@ -240,11 +315,10 @@ class MedicalRecommender:
                 # Remove the specialist recommendation line from response
                 ai_response = re.sub(r"SPECIALIST_RECOMMENDATION:.*", "", ai_response, flags=re.IGNORECASE).strip()
                 
-                # Add doctor recommendations
-                doctor_recommendations = self.get_doctor_recommendations(specialist_type, user_city)
+                # Instead of automatically showing doctors, ask if they want to see them
+                doctor_prompt = f"\n\nWould you like me to show you a list of qualified {specialist_type}s in your area? I can help you find doctors based on location or ratings."
                 
-                # Combine the responses
-                final_response = ai_response + "\n\n" + doctor_recommendations
+                final_response = ai_response + doctor_prompt
                 
                 logger.info(f"Made specialist recommendation: {specialist_type}")
                 return final_response
