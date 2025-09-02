@@ -25,8 +25,9 @@ sys.path.insert(0, str(project_root))  # Add project root for doctor_recommender
 from flask import Flask, render_template, request, jsonify, redirect, url_for, session, make_response
 import gradio as gr
 
-# Import authentication database
+# Import authentication database and MongoDB chat history
 from medibot2_auth import MedibotAuthDatabase
+from mongodb_chat import MongoDBChatHistory
 
 # Import your medical recommender directly with doctor integration
 medical_recommender = None
@@ -60,8 +61,9 @@ except ImportError as e:
 app = Flask(__name__)
 app.secret_key = os.getenv('SECRET_KEY', 'your-secret-key-change-this-in-production')
 
-# Initialize authentication database
+# Initialize authentication database (MySQL) and chat history (MongoDB)
 auth_db = MedibotAuthDatabase()
+chat_history_db = MongoDBChatHistory()
 
 # Store conversation histories for each user
 user_conversations = {}
@@ -326,14 +328,22 @@ def api_chat():
             print("⚠ Using fallback response - MedicalRecommender not available")
             response = fallback_medical_response(message)
         
-        # Save chat to database
+        # Save chat to MongoDB
         try:
-            # Get session token for saving chat with conversation tracking
+            # Get session token for conversation tracking  
             session_token = request.cookies.get('session_token')
-            auth_db.save_chat_message(user_id, message, response, session_token=session_token)
-            print("💾 Chat saved to database")
+            
+            # Get conversation_id from user session if available
+            conversation_id = None
+            if session_token:
+                user_session = auth_db.verify_session(session_token)
+                if user_session:
+                    conversation_id = user_session.get('conversation_id')
+            
+            chat_history_db.save_chat_message(user_id, message, response, conversation_id, session_token)
+            print("💾 Chat saved to MongoDB")
         except Exception as e:
-            print(f"⚠ Failed to save chat to database: {e}")
+            print(f"⚠ Failed to save chat to MongoDB: {e}")
         
         # EHR Integration: Check if message contains symptoms and save them
         try:
@@ -560,18 +570,23 @@ def api_doctor_stats():
 @app.route('/api/chat-history')
 @login_required
 def api_chat_history():
-    """Get user's chat history"""
+    """Get user's chat history from MongoDB"""
     try:
         limit = request.args.get('limit', 50, type=int)
-        history = auth_db.get_chat_history(request.user['id'], limit)
+        history = chat_history_db.get_chat_history(request.user['id'], limit)
         
         # Format history for frontend
         formatted_history = []
         for message, response, timestamp in history:
+            # Convert timestamp to string if it's a datetime object
+            timestamp_str = timestamp
+            if hasattr(timestamp, 'isoformat'):
+                timestamp_str = timestamp.isoformat()
+            
             formatted_history.append({
                 'message': message,
                 'response': response,
-                'timestamp': timestamp
+                'timestamp': timestamp_str
             })
         
         return jsonify({
@@ -623,8 +638,8 @@ def api_clear_chat_history():
     try:
         user_id = request.user['id']
         
-        # Clear from database using the new method
-        deleted_count = auth_db.clear_all_user_chats(user_id)
+        # Clear from MongoDB
+        deleted_count = chat_history_db.clear_all_user_chats(user_id)
         
         # Clear from memory conversation
         if user_id in user_conversations:
@@ -696,8 +711,8 @@ def api_clear_all_chats():
     try:
         user_id = request.user['id']
         
-        # Use the new clear method
-        deleted_count = auth_db.clear_all_user_chats(user_id)
+        # Use MongoDB clear method
+        deleted_count = chat_history_db.clear_all_user_chats(user_id)
         
         # Clear from memory conversation
         if user_id in user_conversations:
@@ -1054,5 +1069,81 @@ if __name__ == '__main__':
     print("  📝 Register: http://localhost:5000/register")
     print("  💬 Chat (after login): http://localhost:5000/chat")
     print("=" * 70)
+    
+# ============================================
+# MongoDB Conversation Management API Endpoints
+# ============================================
+
+@app.route('/api/conversations', methods=['GET'])
+@login_required
+def api_get_conversations():
+    """Get user's conversations from MongoDB"""
+    try:
+        conversations = chat_history_db.get_user_conversations(request.user['id'])
+        return jsonify({
+            'success': True,
+            'conversations': conversations
+        })
+    except Exception as e:
+        print(f"Get conversations error: {e}")
+        return jsonify({'error': 'Failed to retrieve conversations'}), 500
+
+@app.route('/api/conversation/<conversation_id>/messages', methods=['GET'])
+@login_required
+def api_get_conversation_messages(conversation_id):
+    """Get messages in a specific conversation from MongoDB"""
+    try:
+        messages = chat_history_db.get_conversation_messages(conversation_id, request.user['id'])
+        return jsonify({
+            'success': True,
+            'messages': messages,
+            'conversation_id': conversation_id
+        })
+    except Exception as e:
+        print(f"Get conversation messages error: {e}")
+        return jsonify({'error': 'Failed to retrieve conversation messages'}), 500
+
+@app.route('/api/conversation/<conversation_id>', methods=['DELETE'])
+@login_required
+def api_delete_conversation(conversation_id):
+    """Delete a specific conversation from MongoDB"""
+    try:
+        success = chat_history_db.delete_conversation(conversation_id, request.user['id'])
+        if success:
+            return jsonify({
+                'success': True,
+                'message': 'Conversation deleted successfully'
+            })
+        else:
+            return jsonify({'error': 'Failed to delete conversation'}), 500
+            
+    except Exception as e:
+        print(f"Delete conversation error: {e}")
+        return jsonify({'error': 'Failed to delete conversation'}), 500
+
+# ============================================
+# Application Startup
+# ============================================
+
+if __name__ == "__main__":
+    print("🚀 Starting medibot2 Application...")
+    
+    # Check dependencies
+    openai_ok = check_openai_key()
+    doctor_db_ok = check_doctor_database()
+    
+    print("=" * 70)
+    print("✅ Features Available:")
+    print(f"  📱 Authentication System: ✅ Ready (medibot2 MySQL)")
+    print(f"  💬 Chat History: ✅ Ready (MongoDB)")
+    print(f"  🤖 Medical AI: {'✅ Ready' if openai_ok else '⚠ Limited'}")
+    print(f"  🏥 Doctor Database: {'✅ Ready' if doctor_db_ok else '⚠ Unavailable'}")
+    print(f"  🗄️  User Database: medibot2 (MySQL)")
+    print(f"  🗄️  Chat Database: {chat_history_db.database_name} (MongoDB)")
+    print("\n🌐 Access URLs:")
+    print("  📱 Main app: http://localhost:5000")
+    print("  🔐 Login: http://localhost:5000/login")
+    print("  📝 Register: http://localhost:5000/register")
+    print("  💬 Chat (after login): http://localhost:5000/chat")
     
     app.run(debug=True, port=5000, use_reloader=False)
