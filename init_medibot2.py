@@ -100,6 +100,33 @@ def init_medibot2_database():
         """)
         print("✅ Chat history table created/verified")
         
+        # Create doctors table
+        print("📋 Creating doctors table...")
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS doctors (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                city VARCHAR(100) NOT NULL,
+                speciality VARCHAR(100) NOT NULL,
+                profile_url TEXT,
+                name VARCHAR(200) NOT NULL,
+                degree VARCHAR(100),
+                year_of_experience INT,
+                location VARCHAR(200),
+                dp_score DECIMAL(3,1),
+                npv INT,
+                consultation_fee INT,
+                google_map_link TEXT,
+                scraped_at DATETIME,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                INDEX idx_city (city),
+                INDEX idx_speciality (speciality),
+                INDEX idx_name (name),
+                INDEX idx_city_speciality (city, speciality)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+        """)
+        print("✅ Doctors table created/verified")
+        
         # Show table information
         print("\n📊 Database Schema Information:")
         cursor.execute("SHOW TABLES")
@@ -109,7 +136,7 @@ def init_medibot2_database():
         
         # Show table counts
         print("\n📈 Table Statistics:")
-        for table in ['users', 'user_sessions', 'chat_history']:
+        for table in ['users', 'user_sessions', 'chat_history', 'doctors']:
             cursor.execute(f"SELECT COUNT(*) FROM {table}")
             count = cursor.fetchone()[0]
             print(f"   {table}: {count} records")
