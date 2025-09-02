@@ -51,7 +51,7 @@ class MongoDBChatHistory:
     
     def init_collections(self):
         """Initialize MongoDB collections and indexes"""
-        if not self.db:
+        if self.db is None:
             return
             
         # Create collections if they don't exist
