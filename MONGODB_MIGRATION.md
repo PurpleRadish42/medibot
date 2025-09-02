@@ -297,6 +297,18 @@ def migrate_user_chats(user_id):
 - Add required MongoDB variables
 - Restart the application
 
+#### 4. Database Truth Value Testing Error
+```
+⚠️  MongoDB initialization failed: Database objects do not implement truth value testing or bool(). Please compare with None instead: database is not None
+```
+**Solutions:**
+- This error occurs with PyMongo 4.x+ versions due to deprecated boolean evaluation of database objects
+- **Fixed in latest version**: The code has been updated to use `if self.db is None:` instead of `if not self.db:`
+- If you encounter this error:
+  - Make sure you're using the latest version of the medibot code
+  - Check that `mongodb_chat.py` uses `if self.db is None:` in the `init_collections` method
+- **Root cause**: PyMongo 4.x removed support for truthiness testing on Database objects to prevent ambiguous comparisons
+
 ### Fallback Behavior
 
 If MongoDB is unavailable, the application will:
