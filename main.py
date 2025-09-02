@@ -1083,7 +1083,7 @@ if __name__ == "__main__":
     print("🚀 Starting medibot2 Application...")
     
     # Check dependencies
-    openai_ok = check_openai_key()
+    openai_ok = check_openai_setup()
     doctor_db_ok = check_doctor_database()
     
     print("=" * 70)
