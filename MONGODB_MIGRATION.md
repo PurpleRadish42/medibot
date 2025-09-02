@@ -107,7 +107,63 @@ Expected output:
 
 ### Step 4: Verify Migration is Working
 
-Start the application:
+Run the verification script to check your setup:
+
+```bash
+python verify_mongodb_migration.py
+```
+
+This will check:
+- ✅ Required Python dependencies
+- ✅ .env file configuration
+- ✅ MongoDB connection
+- ✅ MySQL connection (for user auth)
+- ✅ Application module imports
+
+Expected output for successful setup:
+```
+🔧 MongoDB Migration Verification
+==================================================
+🔍 Checking Python dependencies...
+   ✅ pymongo
+   ✅ pymysql
+   ✅ dotenv
+   ✅ flask
+
+🔍 Checking .env file...
+   ✅ .env file exists
+   ✅ MONGODB_URI: mongodb://***:***@your-host:27017/medibot_chats
+   ✅ MONGODB_DATABASE: medibot_chats
+   ✅ MYSQL_HOST: localhost
+   ✅ MYSQL_USERNAME: root
+   ✅ MYSQL_DATABASE: medibot
+
+🔍 Testing application modules...
+   ✅ Core modules import successfully
+   ✅ Database modules initialize correctly
+
+🔍 Testing MongoDB connection...
+   ✅ MongoDB connection successful
+   📊 Database: medibot_chats
+   📋 Collections: ['chat_messages', 'chat_sessions']
+
+🔍 Testing MySQL connection...
+   ✅ MySQL connection successful
+   📊 User authentication database ready
+
+==================================================
+📊 Verification Summary:
+   ✅ PASS Dependencies
+   ✅ PASS Environment
+   ✅ PASS Application
+   ✅ PASS MongoDB
+   ✅ PASS MySQL
+
+==================================================
+🎉 All checks passed! Your MongoDB migration is ready!
+```
+
+Then start the application:
 
 ```bash
 python main.py
@@ -334,13 +390,29 @@ After successful migration:
 3. **Data Cleanup**: After confident in MongoDB stability, consider archiving old MySQL chat data
 4. **Optimization**: Add more indexes if specific query patterns emerge
 
+## Quick Verification
+
+Use the included verification script to check your setup:
+
+```bash
+python verify_mongodb_migration.py
+```
+
+This script will:
+- Check all required dependencies are installed
+- Verify .env file configuration  
+- Test MongoDB and MySQL connections
+- Confirm application modules can be imported
+- Provide specific guidance for any issues found
+
 ## Support
 
 If you encounter issues:
-1. Check the application logs for specific error messages
-2. Verify MongoDB connection using `setup_mongodb.py`
-3. Test with a fresh user account to isolate issues
-4. Check MongoDB server logs for connection/authentication issues
+1. **Run the verification script first**: `python verify_mongodb_migration.py`
+2. Check the application logs for specific error messages
+3. Verify MongoDB connection using `setup_mongodb.py`
+4. Test with a fresh user account to isolate issues
+5. Check MongoDB server logs for connection/authentication issues
 
 ---
 
