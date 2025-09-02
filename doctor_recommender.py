@@ -1,5 +1,5 @@
 """
-Doctor recommendation system - FIXED for your exact CSV specialties
+Doctor recommendation system - Updated to use MySQL database instead of CSV
 """
 import pandas as pd
 import re
@@ -7,11 +7,19 @@ from pathlib import Path
 from typing import List, Dict, Optional
 import logging
 from markupsafe import Markup
+import os
+import pymysql
+from dotenv import load_dotenv
+
+# Load environment variables
+load_dotenv()
 
 class DoctorRecommender:
-    def __init__(self, csv_path: str = "cleaned_doctors_full.csv"):
+    def __init__(self, use_database: bool = True, csv_path: str = "cleaned_doctors_full.csv"):
+        self.use_database = use_database
         self.csv_path = csv_path
         self.doctors_df = None
+        self.db_connection = None
         
         # EXACT MAPPING to your CSV specialties
         self.specialty_mapping = {
@@ -60,7 +68,90 @@ class DoctorRecommender:
             "cosmetologist": "Cosmetologist"
         }
         
-        self.load_doctors_data()
+        # Initialize data loading
+        if self.use_database:
+            self.load_doctors_from_database()
+        else:
+            self.load_doctors_data()
+    
+    def get_db_connection(self):
+        """Get MySQL database connection"""
+        if self.db_connection and self.db_connection.open:
+            return self.db_connection
+            
+        try:
+            mysql_config = {
+                'host': os.getenv('MYSQL_HOST', 'localhost'),
+                'port': int(os.getenv('MYSQL_PORT', '3306')),
+                'user': os.getenv('MYSQL_USERNAME', 'root'),
+                'password': os.getenv('MYSQL_PASSWORD', ''),
+                'database': os.getenv('MYSQL_DATABASE', 'medibot2'),
+                'charset': 'utf8mb4',
+                'autocommit': True
+            }
+            
+            self.db_connection = pymysql.connect(**mysql_config)
+            return self.db_connection
+        except Exception as e:
+            print(f"❌ Database connection failed: {e}")
+            return None
+    
+    def load_doctors_from_database(self):
+        """Load doctors data from MySQL database"""
+        try:
+            conn = self.get_db_connection()
+            if not conn:
+                print("❌ Database connection failed, falling back to CSV")
+                self.use_database = False
+                return self.load_doctors_data()
+            
+            cursor = conn.cursor()
+            
+            # Check if doctors table exists and has data
+            cursor.execute("SELECT COUNT(*) FROM doctors")
+            count = cursor.fetchone()[0]
+            
+            if count == 0:
+                print("⚠️  Doctors table is empty, falling back to CSV")
+                self.use_database = False
+                return self.load_doctors_data()
+            
+            # Load all doctors data
+            query = """
+                SELECT city, speciality, profile_url, name, degree, 
+                       year_of_experience, location, dp_score, npv, 
+                       consultation_fee, google_map_link
+                FROM doctors
+                ORDER BY name
+            """
+            
+            cursor.execute(query)
+            results = cursor.fetchall()
+            
+            # Convert to DataFrame for compatibility with existing code
+            columns = ['city', 'speciality', 'profile_url', 'name', 'degree', 
+                      'year_of_experience', 'location', 'dp_score', 'npv', 
+                      'consultation_fee', 'google_map_link']
+            
+            self.doctors_df = pd.DataFrame(results, columns=columns)
+            
+            print(f"✅ Loaded {len(self.doctors_df)} doctors from database")
+            print(f"📊 Unique specialties: {self.doctors_df['speciality'].nunique()}")
+            
+            # Show available specialties for debugging
+            print("🔍 Available specialties in database:")
+            unique_specialties = sorted(self.doctors_df['speciality'].unique())
+            for specialty in unique_specialties:
+                count = len(self.doctors_df[self.doctors_df['speciality'] == specialty])
+                print(f"  • {specialty} ({count} doctors)")
+            
+            return True
+            
+        except Exception as e:
+            print(f"❌ Error loading from database: {e}")
+            print("📂 Falling back to CSV...")
+            self.use_database = False
+            return self.load_doctors_data()
     
     def load_doctors_data(self):
         """Load and preprocess doctors data from CSV"""
@@ -98,28 +189,142 @@ class DoctorRecommender:
             return False
     
     def find_specialty_match(self, recommended_specialist: str) -> str:
-        """Find exact matching specialty in CSV - SIMPLIFIED"""
+        """Find exact matching specialty - Works with both database and CSV"""
         recommended_lower = recommended_specialist.lower().strip()
         
         print(f"🔍 Looking for: '{recommended_specialist}'")
         
-        # Direct mapping to exact CSV specialty
+        # Direct mapping to exact specialty
         if recommended_lower in self.specialty_mapping:
             exact_specialty = self.specialty_mapping[recommended_lower]
             print(f"✅ Found mapping: '{recommended_specialist}' → '{exact_specialty}'")
             return exact_specialty
         
         # Fallback: try partial matching
+        if self.use_database:
+            return self.find_specialty_in_database(recommended_lower)
+        else:
+            return self.find_specialty_in_dataframe(recommended_lower)
+    
+    def find_specialty_in_database(self, recommended_lower: str) -> str:
+        """Find specialty in database using SQL"""
+        try:
+            conn = self.get_db_connection()
+            if not conn:
+                return None
+                
+            cursor = conn.cursor()
+            
+            # Try partial matching
+            cursor.execute("SELECT DISTINCT speciality FROM doctors WHERE LOWER(speciality) LIKE %s LIMIT 1", 
+                          [f'%{recommended_lower}%'])
+            result = cursor.fetchone()
+            
+            if result:
+                specialty = result[0]
+                print(f"✅ Found partial match in database: '{specialty}'")
+                return specialty
+                
+        except Exception as e:
+            print(f"❌ Database specialty search failed: {e}")
+        
+        print(f"❌ No match found for '{recommended_lower}'")
+        return None
+    
+    def find_specialty_in_dataframe(self, recommended_lower: str) -> str:
+        """Find specialty in DataFrame"""
+        if self.doctors_df is None:
+            return None
+            
         available_specialties = self.doctors_df['speciality'].unique()
         for specialty in available_specialties:
             if recommended_lower in specialty.lower():
                 print(f"✅ Found partial match: '{specialty}'")
                 return specialty
         
-        print(f"❌ No match found for '{recommended_specialist}'")
+        print(f"❌ No match found for '{recommended_lower}'")
         return None
     
     def recommend_doctors(self, specialist_type: str, city: str = None, limit: int = 5, sort_by: str = "rating") -> List[Dict]:
+        """Recommend doctors based on specialist type with sorting options - Database optimized"""
+        if self.use_database:
+            return self.recommend_doctors_from_database(specialist_type, city, limit, sort_by)
+        else:
+            return self.recommend_doctors_from_dataframe(specialist_type, city, limit, sort_by)
+    
+    def recommend_doctors_from_database(self, specialist_type: str, city: str = None, limit: int = 5, sort_by: str = "rating") -> List[Dict]:
+        """Recommend doctors from database - Direct SQL query for better performance"""
+        try:
+            conn = self.get_db_connection()
+            if not conn:
+                print("❌ Database connection failed")
+                return []
+            
+            cursor = conn.cursor()
+            
+            # Find matching specialty
+            matched_specialty = self.find_specialty_match(specialist_type)
+            if not matched_specialty:
+                print(f"❌ No specialty match found for '{specialist_type}'")
+                return []
+            
+            # Build query with optional city filter
+            base_query = """
+                SELECT city, speciality, profile_url, name, degree, 
+                       year_of_experience, location, dp_score, npv, 
+                       consultation_fee, google_map_link
+                FROM doctors 
+                WHERE speciality = %s
+            """
+            
+            params = [matched_specialty]
+            
+            if city:
+                base_query += " AND city LIKE %s"
+                params.append(f"%{city}%")
+            
+            # Add sorting
+            if sort_by == "rating":
+                base_query += " ORDER BY dp_score DESC, year_of_experience DESC"
+            elif sort_by == "experience":
+                base_query += " ORDER BY year_of_experience DESC, dp_score DESC"
+            elif sort_by == "fee":
+                base_query += " ORDER BY consultation_fee ASC, dp_score DESC"
+            else:
+                base_query += " ORDER BY dp_score DESC"
+            
+            base_query += f" LIMIT %s"
+            params.append(limit)
+            
+            cursor.execute(base_query, params)
+            results = cursor.fetchall()
+            
+            # Convert to list of dictionaries
+            doctors = []
+            for row in results:
+                doctor = {
+                    'city': row[0],
+                    'specialty': row[1],
+                    'profile_url': row[2],
+                    'name': row[3],
+                    'degree': row[4],
+                    'experience': row[5] if row[5] is not None else 0,
+                    'location': row[6],
+                    'rating': float(row[7]) if row[7] is not None else 0.0,
+                    'npv': row[8] if row[8] is not None else 0,
+                    'fee': row[9] if row[9] is not None else 0,
+                    'map_link': row[10]
+                }
+                doctors.append(doctor)
+            
+            print(f"✅ Found {len(doctors)} {matched_specialty}s" + (f" in {city}" if city else ""))
+            return doctors
+            
+        except Exception as e:
+            print(f"❌ Database query failed: {e}")
+            return []
+    
+    def recommend_doctors_from_dataframe(self, specialist_type: str, city: str = None, limit: int = 5, sort_by: str = "rating") -> List[Dict]:
         """Recommend doctors based on specialist type with sorting options - SIMPLIFIED"""
         if self.doctors_df is None:
             print("❌ No doctor data loaded")
@@ -286,32 +491,95 @@ class DoctorRecommender:
 
     def get_statistics(self) -> Dict:
         """Get statistics about the doctors database"""
+        if self.use_database:
+            return self.get_database_statistics()
+        else:
+            return self.get_dataframe_statistics()
+    
+    def get_database_statistics(self) -> Dict:
+        """Get statistics from database"""
+        try:
+            conn = self.get_db_connection()
+            if not conn:
+                return {"error": "Database connection failed"}
+            
+            cursor = conn.cursor()
+            
+            # Total doctors
+            cursor.execute("SELECT COUNT(*) FROM doctors")
+            total_doctors = cursor.fetchone()[0]
+            
+            # Unique specialties
+            cursor.execute("SELECT COUNT(DISTINCT speciality) FROM doctors")
+            unique_specialties = cursor.fetchone()[0]
+            
+            # Unique cities
+            cursor.execute("SELECT COUNT(DISTINCT city) FROM doctors")
+            unique_cities = cursor.fetchone()[0]
+            
+            # Top specialties
+            cursor.execute("""
+                SELECT speciality, COUNT(*) as count 
+                FROM doctors 
+                GROUP BY speciality 
+                ORDER BY count DESC 
+                LIMIT 5
+            """)
+            top_specialties = {row[0]: row[1] for row in cursor.fetchall()}
+            
+            # Average consultation fee
+            cursor.execute("SELECT AVG(consultation_fee) FROM doctors WHERE consultation_fee > 0")
+            avg_fee_result = cursor.fetchone()[0]
+            avg_consultation_fee = float(avg_fee_result) if avg_fee_result else 0
+            
+            return {
+                "total_doctors": total_doctors,
+                "unique_specialties": unique_specialties,
+                "unique_cities": unique_cities,
+                "top_specialties": top_specialties,
+                "average_consultation_fee": round(avg_consultation_fee, 2),
+                "data_source": "database"
+            }
+            
+        except Exception as e:
+            return {"error": f"Database statistics failed: {e}"}
+    
+    def get_dataframe_statistics(self) -> Dict:
+        """Get statistics from DataFrame (CSV fallback)"""
         if self.doctors_df is None:
-            return {}
+            return {"error": "No doctor data loaded"}
         
-        return {
-            'total_doctors': len(self.doctors_df),
-            'total_cities': self.doctors_df['city'].nunique(),
-            'total_specialties': self.doctors_df['speciality'].nunique(),
-            'avg_experience': float(self.doctors_df['year_of_experience'].mean()) if not self.doctors_df['year_of_experience'].isna().all() else 0,
-            'avg_consultation_fee': float(self.doctors_df['consultation_fee'].mean()) if not self.doctors_df['consultation_fee'].isna().all() else 0,
-            'top_cities': self.doctors_df['city'].value_counts().head(5).to_dict(),
-            'top_specialties': self.doctors_df['speciality'].value_counts().head(10).to_dict()
-        }
+        try:
+            return {
+                "total_doctors": len(self.doctors_df),
+                "unique_specialties": self.doctors_df['speciality'].nunique(),
+                "unique_cities": self.doctors_df['city'].nunique(), 
+                "top_specialties": self.doctors_df['speciality'].value_counts().head(5).to_dict(),
+                "average_consultation_fee": round(self.doctors_df['consultation_fee'].mean(), 2),
+                "data_source": "csv"
+            }
+        except Exception as e:
+            return {"error": f"Statistics calculation failed: {e}"}
 
 # Test the system
 if __name__ == "__main__":
-    print("🧪 TESTING OPHTHALMOLOGIST SEARCH")
+    print("🧪 TESTING DOCTOR RECOMMENDER (Database vs CSV)")
     print("=" * 50)
     
-    recommender = DoctorRecommender()
+    # Test with database first, then CSV fallback
+    recommender = DoctorRecommender(use_database=True)
     
-    if recommender.doctors_df is not None:
+    if recommender.use_database:
+        print("✅ Using database mode")
+    else:
+        print("📂 Using CSV fallback mode")
+    
+    if (recommender.use_database and recommender.get_db_connection()) or (not recommender.use_database and recommender.doctors_df is not None):
         # Test ophthalmologist search
         test_cases = [
-            ("ophthalmologist", "Mumbai"),
+            ("ophthalmologist", "Bangalore"),
             ("eye specialist", "Delhi"),
-            ("cardiologist", "Bangalore"),
+            ("cardiologist", "Mumbai"),
             ("general practitioner", None)
         ]
         
