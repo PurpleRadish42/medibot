@@ -1429,6 +1429,11 @@
             }
             
             localStorage.setItem('medbot_chats', JSON.stringify(savedChats));
+            
+            // Also save as fallback for database-style loading (for when DB is unavailable)
+            const fallbackKey = `chat_fallback_db-session-${Date.now()}`;
+            localStorage.setItem(fallbackKey, JSON.stringify(window.ChatState.chatHistory));
+            console.log("💾 Saved chat to fallback storage:", fallbackKey);
         }
 
         // FIXED: Load chat session function (supports both localStorage and database chats)
@@ -1448,44 +1453,67 @@
             const savedChats = JSON.parse(localStorage.getItem('medbot_chats') || '[]');
             chat = savedChats.find(c => c.id === chatId);
             
-            // If not found in localStorage and it's a database chat, load from converted data
-            if (!chat && chatId.startsWith('db_')) {
-                // Find chat in the DOM to get its data
-                const chatElement = document.querySelector(`[data-chat-id="${chatId}"]`);
-                if (chatElement) {
-                    // For database chats, we need to reconstruct the chat object
-                    const title = chatElement.querySelector('.chat-item-title').textContent;
-                    
-                    // Load conversation messages from database
-                    console.log("📄 Loading database chat session:", chatId);
-                    
-                    try {
-                        const response = await fetch(`/api/conversation/${chatId}/messages`);
-                        if (!response.ok) {
-                            throw new Error(`Failed to load conversation: ${response.status}`);
-                        }
-                        
+            // If not found in localStorage and it's a database chat, try to load from local fallback
+            if (!chat && chatId.startsWith('db-session-')) {
+                console.log("📄 Attempting to load database chat session:", chatId);
+                
+                // Try to load from database first
+                try {
+                    const response = await fetch(`/api/conversation/${chatId}/messages`);
+                    if (response.ok) {
                         const data = await response.json();
-                        if (!data.success) {
-                            throw new Error(data.error || 'Failed to load conversation');
+                        if (data.success) {
+                            // Convert database message format to frontend format
+                            const convertedMessages = convertDatabaseMessagesToFrontendFormat(data.messages || []);
+                            
+                            chat = {
+                                id: chatId,
+                                title: `Chat ${chatId.replace('db-session-', '')}`,
+                                messages: convertedMessages,
+                                date: new Date().toISOString(),
+                                source: 'database'
+                            };
+                            
+                            console.log(`✅ Loaded conversation ${chatId} with ${chat.messages.length} messages from database`);
                         }
+                    }
+                } catch (error) {
+                    console.warn("⚠️  Database unavailable, trying local fallback:", error);
+                }
+                
+                // If database failed, try to reconstruct from DOM data
+                if (!chat) {
+                    console.log("🔄 Database failed, attempting to reconstruct from stored data...");
+                    
+                    // Find chat in the DOM to get its data
+                    const chatElement = document.querySelector(`[data-chat-id="${chatId}"]`);
+                    if (chatElement) {
+                        const title = chatElement.querySelector('.chat-item-title').textContent;
                         
-                        // Convert database message format to frontend format
-                        const convertedMessages = convertDatabaseMessagesToFrontendFormat(data.messages || []);
+                        // Try to find the messages in a fallback storage
+                        const fallbackKey = `chat_fallback_${chatId}`;
+                        const storedMessages = localStorage.getItem(fallbackKey);
                         
-                        chat = {
-                            id: chatId,
-                            title: title,
-                            messages: convertedMessages,
-                            date: new Date().toISOString(),
-                            source: 'database'
-                        };
-                        
-                        console.log(`✅ Loaded conversation ${chatId} with ${chat.messages.length} messages`);
-                        
-                    } catch (error) {
-                        console.error("❌ Failed to load database conversation:", error);
-                        showStatus("Failed to load conversation from database", "error");
+                        if (storedMessages) {
+                            try {
+                                const messages = JSON.parse(storedMessages);
+                                chat = {
+                                    id: chatId,
+                                    title: title,
+                                    messages: messages,
+                                    date: new Date().toISOString(),
+                                    source: 'fallback'
+                                };
+                                console.log(`✅ Loaded conversation ${chatId} from fallback storage`);
+                            } catch (e) {
+                                console.error("❌ Failed to parse fallback data:", e);
+                            }
+                        }
+                    }
+                    
+                    if (!chat) {
+                        console.error("❌ Could not load conversation from database or fallback");
+                        showStatus("Conversation not found. The database may be unavailable.", "error");
                         return;
                     }
                 }
@@ -1642,6 +1670,10 @@
                 
                 const response = await fetch('/api/chat-history');
                 if (!response.ok) {
+                    if (response.status === 302 || response.status === 401) {
+                        console.warn("❌ Authentication required for database chat history - skipping");
+                        return;
+                    }
                     console.warn("❌ Failed to load chat history from database:", response.status);
                     return;
                 }

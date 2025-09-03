@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MediBot Fix Testing</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .test-section { margin: 20px 0; padding: 20px; border: 1px solid #ccc; border-radius: 8px; }
+        .test-section h2 { margin-top: 0; }
+        button { padding: 10px 20px; margin: 5px; cursor: pointer; }
+        #response { margin-top: 20px; padding: 15px; background: #f5f5f5; border-radius: 5px; min-height: 100px; }
+        .email-button { background: #28a745; color: white; border: none; border-radius: 5px; padding: 8px 15px; margin: 10px 0; }
+        table { border-collapse: collapse; width: 100%; margin: 10px 0; }
+        th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+        th { background-color: #f2f2f2; }
+    </style>
+</head>
+<body>
+    <h1>🩺 MediBot Fix Testing</h1>
+    
+    <div class="test-section">
+        <h2>✅ Fix 1: Doctor Recommendations with Email Button</h2>
+        <p>Test if doctor recommendations work properly and show the email button.</p>
+        
+        <button onclick="testDoctorRecommendations('I have a headache')">Test: Headache</button>
+        <button onclick="testDoctorRecommendations('I have chest pain')">Test: Chest Pain</button>
+        <button onclick="testDoctorRecommendations('I have a skin rash')">Test: Skin Rash</button>
+        
+        <div id="response"></div>
+    </div>
+    
+    <div class="test-section">
+        <h2>✅ Fix 2: Chat History Functionality</h2>
+        <p>Test if chat history works properly (local storage fallback when database unavailable).</p>
+        
+        <button onclick="showLocalStorage()">Show Local Storage</button>
+        <button onclick="clearLocalStorage()">Clear Local Storage</button>
+        <button onclick="simulateChatHistory()">Simulate Chat History</button>
+        
+        <div id="chat-history-test"></div>
+    </div>
+    
+    <script>
+        // Test Fix 1: Doctor Recommendations
+        async function testDoctorRecommendations(message) {
+            console.log('Testing:', message);
+            const responseDiv = document.getElementById('response');
+            responseDiv.innerHTML = '<p>Loading...</p>';
+            
+            try {
+                const response = await fetch('/api/test-chat', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ message: message })
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok) {
+                    responseDiv.innerHTML = data.response;
+                    
+                    // Check if email button should appear
+                    const hasTable = data.response.includes('<table');
+                    const hasImportantNotes = data.response.includes('Important Notes:');
+                    const shouldShowEmail = hasTable && hasImportantNotes;
+                    
+                    if (shouldShowEmail) {
+                        // Add test email button
+                        const emailBtn = document.createElement('button');
+                        emailBtn.className = 'email-button';
+                        emailBtn.innerHTML = '✉️ Send via Email';
+                        emailBtn.onclick = () => alert('Email button works! (This would open email modal)');
+                        responseDiv.appendChild(emailBtn);
+                        
+                        // Add success message
+                        const successMsg = document.createElement('div');
+                        successMsg.style.cssText = 'background: #d4edda; color: #155724; padding: 10px; margin: 10px 0; border-radius: 5px;';
+                        successMsg.innerHTML = '✅ <strong>Fix 1 SUCCESS:</strong> Doctor recommendations loaded with email button!';
+                        responseDiv.insertBefore(successMsg, responseDiv.firstChild);
+                    } else {
+                        const errorMsg = document.createElement('div');
+                        errorMsg.style.cssText = 'background: #f8d7da; color: #721c24; padding: 10px; margin: 10px 0; border-radius: 5px;';
+                        errorMsg.innerHTML = `❌ <strong>Fix 1 ISSUE:</strong> Table: ${hasTable}, Notes: ${hasImportantNotes}`;
+                        responseDiv.insertBefore(errorMsg, responseDiv.firstChild);
+                    }
+                } else {
+                    responseDiv.innerHTML = `<p style="color: red;">Error: ${data.error || 'Unknown error'}</p>`;
+                }
+            } catch (error) {
+                responseDiv.innerHTML = `<p style="color: red;">Network Error: ${error.message}</p>`;
+            }
+        }
+        
+        // Test Fix 2: Chat History
+        function showLocalStorage() {
+            const testDiv = document.getElementById('chat-history-test');
+            const chats = JSON.parse(localStorage.getItem('medbot_chats') || '[]');
+            const fallbackKeys = Object.keys(localStorage).filter(key => key.startsWith('chat_fallback_'));
+            
+            testDiv.innerHTML = `
+                <h3>Local Storage Status:</h3>
+                <p><strong>Regular Chats:</strong> ${chats.length} found</p>
+                <p><strong>Fallback Chats:</strong> ${fallbackKeys.length} found</p>
+                <pre style="background: #f0f0f0; padding: 10px; border-radius: 5px; max-height: 200px; overflow-y: auto;">
+${JSON.stringify({regular_chats: chats, fallback_keys: fallbackKeys}, null, 2)}
+                </pre>
+            `;
+        }
+        
+        function clearLocalStorage() {
+            localStorage.removeItem('medbot_chats');
+            Object.keys(localStorage).filter(key => key.startsWith('chat_fallback_')).forEach(key => {
+                localStorage.removeItem(key);
+            });
+            alert('Local storage cleared!');
+            showLocalStorage();
+        }
+        
+        function simulateChatHistory() {
+            // Simulate saving a chat
+            const testChat = {
+                id: Date.now().toString(),
+                title: 'Test Chat - Headache',
+                messages: [
+                    { content: 'I have a headache', isUser: true, timestamp: new Date().toISOString() },
+                    { content: 'I recommend consulting a neurologist...', isUser: false, timestamp: new Date().toISOString() }
+                ],
+                date: new Date().toISOString()
+            };
+            
+            const chats = JSON.parse(localStorage.getItem('medbot_chats') || '[]');
+            chats.unshift(testChat);
+            localStorage.setItem('medbot_chats', JSON.stringify(chats));
+            
+            // Also save fallback
+            const fallbackKey = `chat_fallback_db-session-${Date.now()}`;
+            localStorage.setItem(fallbackKey, JSON.stringify(testChat.messages));
+            
+            alert('✅ Test chat history created!');
+            showLocalStorage();
+        }
+        
+        // Auto-load storage info on page load
+        window.onload = () => {
+            showLocalStorage();
+        };
+    </script>
+</body>
+</html>
