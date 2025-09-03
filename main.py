@@ -92,7 +92,67 @@ def login_required(f):
 
 # Fallback medical response function
 def fallback_medical_response(message):
-    """Fallback response when medical AI is not available"""
+    """Fallback response when medical AI is not available - WITH DOCTOR RECOMMENDATIONS"""
+    
+    # Try to provide doctor recommendations even without OpenAI
+    try:
+        # Import doctor recommender
+        from doctor_recommender import DoctorRecommender
+        dr = DoctorRecommender()
+        
+        # Simple symptom to specialist mapping for fallback
+        symptom_specialist_map = {
+            "headache": "neurologist",
+            "head": "neurologist", 
+            "migraine": "neurologist",
+            "chest": "cardiologist",
+            "heart": "cardiologist",
+            "stomach": "gastroenterologist",
+            "digestive": "gastroenterologist",
+            "skin": "dermatologist",
+            "rash": "dermatologist",
+            "eye": "ophthalmologist",
+            "vision": "ophthalmologist",
+            "joint": "orthopedist",
+            "bone": "orthopedist",
+            "fever": "general physician",
+            "cold": "general physician",
+            "cough": "pulmonologist",
+            "breathing": "pulmonologist"
+        }
+        
+        # Find matching specialist
+        message_lower = message.lower()
+        recommended_specialist = None
+        
+        for symptom, specialist in symptom_specialist_map.items():
+            if symptom in message_lower:
+                recommended_specialist = specialist
+                break
+        
+        if recommended_specialist:
+            # Get doctor recommendations
+            doctors = dr.recommend_doctors(recommended_specialist, "Bangalore", limit=3)
+            if doctors:
+                # Format as HTML with table
+                specialist_name = recommended_specialist.replace("_", " ").title()
+                response = f"<p>I understand you're having {message.lower()}. While our AI assistant is temporarily unavailable, I can still help you find the right specialist.</p>\n"
+                response += f"<p>Based on your symptoms, I recommend consulting a <strong>{specialist_name}</strong>.</p>\n"
+                response += dr.format_doctor_recommendations(doctors, specialist_name)
+                return response
+        
+        # No specialist match found
+        doctors = dr.recommend_doctors("general physician", "Bangalore", limit=2)
+        if doctors:
+            response = "<p>While our AI assistant is temporarily unavailable, I can help you find medical care.</p>\n"
+            response += "<p>For your symptoms, I recommend starting with a <strong>General Physician</strong> who can evaluate your condition and refer you to a specialist if needed.</p>\n"
+            response += dr.format_doctor_recommendations(doctors, "General Physician")
+            return response
+            
+    except Exception as e:
+        print(f"⚠ Fallback doctor recommendation failed: {e}")
+    
+    # Final fallback without doctor recommendations
     responses = {
         "hello": "Hello! I'm your medical assistant. How can I help you today?",
         "headache": "For headaches, try resting in a quiet, dark room, staying hydrated, and applying a cold compress. If headaches persist or are severe, please consult a healthcare professional.",
@@ -109,6 +169,38 @@ def fallback_medical_response(message):
         return responses["fever"]
     else:
         return responses["default"]
+
+# Simple test endpoint without authentication
+@app.route('/api/test-chat', methods=['POST'])
+def api_test_chat():
+    """Simple test endpoint to verify doctor recommendations work"""
+    try:
+        data = request.get_json()
+        message = data.get('message', '').strip()
+        
+        if not message:
+            return jsonify({'error': 'No message provided'}), 400
+        
+        print(f"🧪 TEST: Processing message: {message}")
+        
+        # Use fallback response (since OpenAI is not configured)
+        response = fallback_medical_response(message)
+        
+        print(f"🧪 TEST: Generated response of {len(response)} characters")
+        print(f"🧪 TEST: Contains table: {'<table' in response}")
+        print(f"🧪 TEST: Contains Important Notes: {'Important Notes:' in response}")
+        
+        return jsonify({'response': response})
+    
+    except Exception as e:
+        return jsonify({'error': 'Internal server error'}), 500
+
+# Test page for verifying fixes
+@app.route('/test-fixes')
+def test_fixes():
+    """Test page to verify both fixes work properly"""
+    from flask import send_from_directory
+    return send_from_directory('static', 'test_fixes.html')
 
 # Authentication Routes
 @app.route('/')
