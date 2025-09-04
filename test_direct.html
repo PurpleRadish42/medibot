@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Direct Doctor Test</title>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; }
+        .test-container { max-width: 800px; margin: 0 auto; }
+        .response { border: 1px solid #ccc; padding: 20px; margin: 20px 0; }
+    </style>
+</head>
+<body>
+    <div class="test-container">
+        <h1>Direct Doctor Recommendations Test</h1>
+        <button onclick="testAPI()">Test API Call</button>
+        <div id="response" class="response">Click the button to test...</div>
+    </div>
+
+    <script>
+        async function testAPI() {
+            const responseDiv = document.getElementById('response');
+            responseDiv.innerHTML = 'Loading...';
+            
+            try {
+                const response = await fetch('/api/test-chat', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ message: 'I have chest pain' })
+                });
+                
+                const data = await response.json();
+                
+                responseDiv.innerHTML = `
+                    <h3>API Response:</h3>
+                    <p><strong>Length:</strong> ${data.response.length} characters</p>
+                    <p><strong>Contains table:</strong> ${data.response.includes('<table') ? 'Yes' : 'No'}</p>
+                    <p><strong>Contains Important Notes:</strong> ${data.response.includes('Important Notes:') ? 'Yes' : 'No'}</p>
+                    <hr>
+                    <h3>Rendered HTML:</h3>
+                    <div style="border: 1px solid #ddd; padding: 10px; background: #f9f9f9;">
+                        ${data.response}
+                    </div>
+                `;
+            } catch (error) {
+                responseDiv.innerHTML = `Error: ${error.message}`;
+            }
+        }
+    </script>
+</body>
+</html>

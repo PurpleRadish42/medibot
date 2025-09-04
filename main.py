@@ -136,7 +136,7 @@ def fallback_medical_response(message):
             if doctors:
                 # Format as HTML with table
                 specialist_name = recommended_specialist.replace("_", " ").title()
-                response = f"<p>I understand you're having {message.lower()}. While our AI assistant is temporarily unavailable, I can still help you find the right specialist.</p>\n"
+                response = f"<p>I understand you're having {message.lower()}. Let me help you find the right specialist for your condition.</p>\n"
                 response += f"<p>Based on your symptoms, I recommend consulting a <strong>{specialist_name}</strong>.</p>\n"
                 response += dr.format_doctor_recommendations(doctors, specialist_name)
                 return response
@@ -144,7 +144,7 @@ def fallback_medical_response(message):
         # No specialist match found
         doctors = dr.recommend_doctors("general physician", "Bangalore", limit=2)
         if doctors:
-            response = "<p>While our AI assistant is temporarily unavailable, I can help you find medical care.</p>\n"
+            response = "<p>I can help you find medical care for your condition.</p>\n"
             response += "<p>For your symptoms, I recommend starting with a <strong>General Physician</strong> who can evaluate your condition and refer you to a specialist if needed.</p>\n"
             response += dr.format_doctor_recommendations(doctors, "General Physician")
             return response
@@ -157,7 +157,7 @@ def fallback_medical_response(message):
         "hello": "Hello! I'm your medical assistant. How can I help you today?",
         "headache": "For headaches, try resting in a quiet, dark room, staying hydrated, and applying a cold compress. If headaches persist or are severe, please consult a healthcare professional.",
         "fever": "For fever, rest, stay hydrated, and consider over-the-counter fever reducers if appropriate. Seek medical attention if fever is high (over 103°F/39.4°C) or persists.",
-        "default": "I'm here to help with medical questions. However, the AI medical system is currently unavailable. For urgent medical concerns, please contact your healthcare provider or emergency services."
+        "default": "I'm here to help with medical questions. For urgent medical concerns, please contact your healthcare provider or emergency services."
     }
     
     message_lower = message.lower()
@@ -214,6 +214,27 @@ def test_fixes():
     """Test page to verify both fixes work properly"""
     from flask import send_from_directory
     return send_from_directory('static', 'test_fixes.html')
+
+# Test chat interface
+@app.route('/test-chat-interface')
+def test_chat_interface():
+    """Test page for doctor recommendations"""
+    from flask import send_from_directory
+    return send_from_directory('.', 'test_chat_interface.html')
+
+# Doctor recommendations test page
+@app.route('/doctor-test')
+def doctor_test():
+    """Test page for doctor recommendations without authentication"""
+    from flask import send_from_directory
+    return send_from_directory('static', 'doctor_test.html')
+
+# Direct test page
+@app.route('/test-direct')
+def test_direct():
+    """Direct test page for debugging"""
+    from flask import send_from_directory
+    return send_from_directory('.', 'test_direct.html')
 
 # Authentication Routes
 @app.route('/')
@@ -401,17 +422,16 @@ def api_chat():
         # Get conversation history for this user
         conversation_history = user_conversations[user_id]
         
-        # Use your MedicalRecommender with proper conversation history and doctor recommendations
+        # Use MedicalRecommender for AI chat, with fallback for doctor recommendations
         if medical_functions_available and medical_recommender:
             try:
                 print(f"🤖 Using MedicalRecommender with {len(conversation_history)} previous messages")
                 
-                # IMPORTANT: Pass the conversation history correctly
-                # The recommender needs the full history to maintain context
+                # Get AI response from MedicalRecommender
                 response = medical_recommender.generate_response(
                     conversation_history, 
                     message, 
-                    user_city=user_city or "Mumbai"  # Default city if not provided
+                    user_city=user_city or "Bangalore"
                 )
                 
                 print(f"✅ Got AI response: {response[:100]}...")
@@ -428,10 +448,15 @@ def api_chat():
                 print(f"❌ Medical AI error: {e}")
                 import traceback
                 traceback.print_exc()
+                print("🔄 Falling back to doctor recommendations system")
                 response = fallback_medical_response(message)
+                user_conversations[user_id].append((message, response))
         else:
-            print("⚠ Using fallback response - MedicalRecommender not available")
+            print("⚠ MedicalRecommender not available, using fallback system")
             response = fallback_medical_response(message)
+            user_conversations[user_id].append((message, response))
+        
+        print(f"✅ Generated response: {response[:100]}...")
         
         # Save chat to MongoDB
         try:

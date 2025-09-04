@@ -1,0 +1,298 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Doctor Recommendations Test - MedBot AI</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(15px);
+            border-radius: 15px;
+            padding: 30px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+            color: white;
+        }
+
+        .header h1 {
+            font-size: 2.5rem;
+            margin-bottom: 10px;
+        }
+
+        .test-controls {
+            display: flex;
+            gap: 15px;
+            justify-content: center;
+            margin-bottom: 30px;
+            flex-wrap: wrap;
+        }
+
+        .test-button {
+            padding: 12px 24px;
+            background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+            color: white;
+            border: none;
+            border-radius: 25px;
+            cursor: pointer;
+            font-weight: 600;
+            font-size: 16px;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 15px rgba(79, 172, 254, 0.3);
+        }
+
+        .test-button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(79, 172, 254, 0.4);
+        }
+
+        .test-button:active {
+            transform: translateY(0);
+        }
+
+        .response-container {
+            background: white;
+            border-radius: 15px;
+            padding: 20px;
+            margin-top: 20px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            min-height: 200px;
+        }
+
+        .loading {
+            text-align: center;
+            color: #666;
+            font-style: italic;
+        }
+
+        .error {
+            color: #e74c3c;
+            background: #fdf2f2;
+            padding: 15px;
+            border-radius: 8px;
+            border-left: 4px solid #e74c3c;
+        }
+
+        .success {
+            color: #27ae60;
+            background: #f0f9f0;
+            padding: 15px;
+            border-radius: 8px;
+            border-left: 4px solid #27ae60;
+        }
+
+        /* Doctor recommendation table styles */
+        table {
+            font-size: 0.9rem;
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            width: 100%;
+            min-width: 600px;
+            table-layout: auto;
+            margin: 20px 0;
+        }
+
+        table th {
+            font-size: 0.85rem;
+            padding: 8px 6px !important;
+            white-space: nowrap;
+        }
+
+        table td {
+            padding: 8px 6px !important;
+            font-size: 0.8rem;
+            vertical-align: top;
+        }
+
+        table a {
+            color: #4facfe !important;
+            text-decoration: none;
+            font-weight: 500;
+        }
+
+        table a:hover {
+            text-decoration: underline;
+        }
+
+        /* Responsive table */
+        @media (max-width: 768px) {
+            table {
+                font-size: 0.75rem;
+                min-width: 500px;
+            }
+            
+            table th,
+            table td {
+                padding: 6px 4px !important;
+                font-size: 0.7rem;
+            }
+        }
+
+        .status {
+            margin-top: 15px;
+            padding: 10px;
+            border-radius: 8px;
+            font-weight: 500;
+        }
+
+        .status.info {
+            background: #e3f2fd;
+            color: #1976d2;
+            border-left: 4px solid #1976d2;
+        }
+
+        .status.success {
+            background: #e8f5e8;
+            color: #2e7d32;
+            border-left: 4px solid #2e7d32;
+        }
+
+        .status.error {
+            background: #ffebee;
+            color: #c62828;
+            border-left: 4px solid #c62828;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1><i class="fas fa-stethoscope"></i> Doctor Recommendations Test</h1>
+            <p>Test the doctor recommendation system with different symptoms</p>
+        </div>
+
+        <div class="test-controls">
+            <button class="test-button" onclick="testSymptom('I have chest pain')">
+                <i class="fas fa-heart"></i> Chest Pain
+            </button>
+            <button class="test-button" onclick="testSymptom('I have a headache')">
+                <i class="fas fa-head-side-virus"></i> Headache
+            </button>
+            <button class="test-button" onclick="testSymptom('I feel dizzy and weak')">
+                <i class="fas fa-dizzy"></i> Dizzy
+            </button>
+            <button class="test-button" onclick="testSymptom('I have stomach pain')">
+                <i class="fas fa-stomach"></i> Stomach Pain
+            </button>
+            <button class="test-button" onclick="testSymptom('I have skin rash')">
+                <i class="fas fa-hand-holding-medical"></i> Skin Rash
+            </button>
+            <button class="test-button" onclick="clearResponse()">
+                <i class="fas fa-trash"></i> Clear
+            </button>
+        </div>
+
+        <div class="response-container" id="responseContainer">
+            <div class="loading">
+                <i class="fas fa-robot"></i> Click a button above to test doctor recommendations
+            </div>
+        </div>
+    </div>
+
+    <script>
+        async function testSymptom(symptom) {
+            const container = document.getElementById('responseContainer');
+            
+            // Show loading
+            container.innerHTML = `
+                <div class="loading">
+                    <i class="fas fa-spinner fa-spin"></i> Testing: "${symptom}"...
+                </div>
+            `;
+
+            try {
+                const response = await fetch('/api/test-chat', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ message: symptom })
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    // Check if response contains doctor recommendations
+                    const hasTable = data.response.includes('<table');
+                    const hasImportantNotes = data.response.includes('Important Notes:');
+                    
+                    let statusClass = 'info';
+                    let statusText = 'Response received';
+                    
+                    if (hasTable && hasImportantNotes) {
+                        statusClass = 'success';
+                        statusText = '✅ Doctor recommendations generated successfully!';
+                    } else if (hasTable) {
+                        statusClass = 'info';
+                        statusText = '⚠️ Table found but missing Important Notes';
+                    } else {
+                        statusClass = 'error';
+                        statusText = '❌ No doctor recommendations found';
+                    }
+
+                    container.innerHTML = `
+                        <div class="status ${statusClass}">
+                            <strong>${statusText}</strong><br>
+                            Response length: ${data.response.length} characters<br>
+                            Contains table: ${hasTable ? 'Yes' : 'No'}<br>
+                            Contains Important Notes: ${hasImportantNotes ? 'Yes' : 'No'}
+                        </div>
+                        <div style="margin-top: 20px;">
+                            ${data.response}
+                        </div>
+                    `;
+                } else {
+                    container.innerHTML = `
+                        <div class="error">
+                            <strong>Error ${response.status}:</strong> ${data.error || 'Unknown error'}
+                        </div>
+                    `;
+                }
+            } catch (error) {
+                container.innerHTML = `
+                    <div class="error">
+                        <strong>Network Error:</strong> ${error.message}
+                    </div>
+                `;
+            }
+        }
+
+        function clearResponse() {
+            const container = document.getElementById('responseContainer');
+            container.innerHTML = `
+                <div class="loading">
+                    <i class="fas fa-robot"></i> Click a button above to test doctor recommendations
+                </div>
+            `;
+        }
+
+        // Auto-test on page load
+        window.addEventListener('load', () => {
+            setTimeout(() => {
+                testSymptom('I have chest pain');
+            }, 1000);
+        });
+    </script>
+</body>
+</html>
