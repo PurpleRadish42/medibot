@@ -1453,13 +1453,16 @@
             const savedChats = JSON.parse(localStorage.getItem('medbot_chats') || '[]');
             chat = savedChats.find(c => c.id === chatId);
             
-            // If not found in localStorage and it's a database chat, try to load from local fallback
-            if (!chat && chatId.startsWith('db-session-')) {
-                console.log("📄 Attempting to load database chat session:", chatId);
+            // If not found in localStorage, try to load from database API
+            if (!chat) {
+                console.log("📄 Attempting to load conversation from database:", chatId);
                 
-                // Try to load from database first
+                // Try to load from database first (for both old db-session- IDs and new UUID conversation IDs)
                 try {
-                    const response = await fetch(`/api/conversation/${chatId}/messages`);
+                    // Remove 'db-session-' prefix if present for backward compatibility
+                    const actualConversationId = chatId.startsWith('db-session-') ? chatId.substring(11) : chatId;
+                    
+                    const response = await fetch(`/api/conversation/${actualConversationId}/messages`);
                     if (response.ok) {
                         const data = await response.json();
                         if (data.success) {
@@ -1468,13 +1471,13 @@
                             
                             chat = {
                                 id: chatId,
-                                title: `Chat ${chatId.replace('db-session-', '')}`,
+                                title: data.conversation_title || `Conversation ${actualConversationId.substring(0, 8)}...`, // Use title from API or fallback
                                 messages: convertedMessages,
                                 date: new Date().toISOString(),
                                 source: 'database'
                             };
                             
-                            console.log(`✅ Loaded conversation ${chatId} with ${chat.messages.length} messages from database`);
+                            console.log(`✅ Loaded conversation ${actualConversationId} with ${chat.messages.length} messages from database`);
                         }
                     }
                 } catch (error) {
@@ -1663,38 +1666,55 @@
             }
         }
 
-        // Load chat history from database
+        // Load chat conversations from database (FIXED approach)
         async function loadDatabaseChatHistory() {
             try {
-                console.log("📖 Loading chat history from database...");
+                console.log("📖 Loading conversations from database...");
                 
-                const response = await fetch('/api/chat-history');
+                // Use conversations API instead of chat-history for proper conversation metadata
+                const response = await fetch('/api/conversations');
                 if (!response.ok) {
                     if (response.status === 302 || response.status === 401) {
-                        console.warn("❌ Authentication required for database chat history - skipping");
+                        console.warn("❌ Authentication required for database conversations - skipping");
                         return;
                     }
-                    console.warn("❌ Failed to load chat history from database:", response.status);
+                    console.warn("❌ Failed to load conversations from database:", response.status);
                     return;
                 }
                 
                 const data = await response.json();
                 if (!data.success) {
-                    console.warn("❌ Chat history API returned error:", data.error);
+                    console.warn("❌ Conversations API returned error:", data.error);
                     return;
                 }
                 
-                console.log(`✅ Loaded ${data.history.length} messages from database`);
+                console.log(`✅ Loaded ${data.conversations.length} conversations from database`);
                 
-                // Convert history to chat sessions for sidebar
-                const chatSessions = convertHistoryToChatSessions(data.history);
+                // Convert conversations to chat sessions for sidebar (FIXED)
+                const chatSessions = convertConversationsToChatSessions(data.conversations);
                 console.log(`📋 Converted to ${chatSessions.length} chat sessions`);
                 
                 // Display in sidebar
                 displayChatSessions(chatSessions);
                 
             } catch (error) {
-                console.error("❌ Error loading database chat history:", error);
+                console.error("❌ Error loading database conversations:", error);
+                
+                // Fallback: Try the old chat-history approach if conversations API fails
+                try {
+                    console.log("🔄 Falling back to chat-history API...");
+                    const historyResponse = await fetch('/api/chat-history');
+                    if (historyResponse.ok) {
+                        const historyData = await historyResponse.json();
+                        if (historyData.success) {
+                            const chatSessions = convertHistoryToChatSessions(historyData.history);
+                            displayChatSessions(chatSessions);
+                            console.log("✅ Fallback chat history loaded successfully");
+                        }
+                    }
+                } catch (fallbackError) {
+                    console.warn("⚠️ Fallback also failed:", fallbackError);
+                }
             }
         }
         
@@ -1709,7 +1729,11 @@
                 const entry = history[i];
                 
                 // Create a session for each message/response pair
-                const sessionTitle = `Chat ${sessionId}`;
+                // Use the user's message as the title (truncated if too long)
+                let sessionTitle = entry.message || `Chat ${sessionId}`;
+                if (sessionTitle.length > 50) {
+                    sessionTitle = sessionTitle.substring(0, 47) + "...";
+                }
                 const messages = [
                     {
                         content: entry.message,

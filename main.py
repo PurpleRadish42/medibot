@@ -168,6 +168,19 @@ def fallback_medical_response(message):
     elif "fever" in message_lower or "temperature" in message_lower:
         return responses["fever"]
     else:
+        # If no specific keywords found, show general physician recommendations
+        try:
+            from doctor_recommender import DoctorRecommender
+            dr = DoctorRecommender()
+            doctors = dr.recommend_doctors("general physician", "Bangalore", limit=2)
+            if doctors:
+                response = "<p>I understand you have medical concerns. While our AI assistant is temporarily unavailable, I can help you find medical care.</p>\n"
+                response += "<p>I recommend starting with a <strong>General Physician</strong> who can evaluate your condition and refer you to a specialist if needed.</p>\n"
+                response += dr.format_doctor_recommendations(doctors, "General Physician")
+                return response
+        except Exception as e:
+            print(f"⚠ General physician recommendation failed: {e}")
+        
         return responses["default"]
 
 # Simple test endpoint without authentication
