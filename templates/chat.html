@@ -68,6 +68,18 @@
             box-shadow: 0 5px 15px rgba(79, 172, 254, 0.3);
         }
 
+        .new-chat-btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+
+        .new-chat-btn:disabled:hover {
+            transform: none;
+            box-shadow: none;
+        }
+
         .clear-all-btn {
             width: 100%;
             padding: 0.8rem;
@@ -900,7 +912,7 @@
         <div class="sidebar" id="sidebar">
             <div class="sidebar-header">
                 <h3><i class="fas fa-history"></i> Chat History</h3>
-                <button class="new-chat-btn" onclick="startNewChat()">
+                <button class="new-chat-btn" id="newChatBtn" onclick="startNewChat()">
                     <i class="fas fa-plus"></i> New Chat
                 </button>
                 <button class="clear-all-btn" onclick="clearAllChats()">
@@ -1728,47 +1740,74 @@
             }
         }
 
-        // FIXED: Start new chat function
+        // IMPROVED: Start new chat function with better error handling
         async function startNewChat() {
             console.log("🔄 Starting new chat...");
             console.log("📊 Initial state:", JSON.stringify(window.ChatState));
             
             // Prevent if already resetting
             if (window.ChatState.resetInProgress) {
-                console.log("⏳ Reset already in progress");
+                console.log("⏳ Reset already in progress, ignoring duplicate request");
+                return;
+            }
+            
+            // Prevent if message is being sent
+            if (window.ChatState.sendInProgress) {
+                console.log("⏳ Message send in progress, waiting...");
+                showStatus("Please wait for current message to complete", "warning");
                 return;
             }
             
             showStatus("Starting new chat...", "info", 0);
             window.ChatState.resetInProgress = true;
             
+            // Disable button to prevent multiple clicks
+            const newChatBtn = document.getElementById('newChatBtn');
+            if (newChatBtn) {
+                newChatBtn.disabled = true;
+                newChatBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Starting...';
+            }
+            
             try {
                 // STEP 1: Reset server conversation state FIRST
                 console.log("🔄 Calling /api/reset endpoint...");
+                
+                // Add timeout to prevent hanging
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
+                
                 const resetResponse = await fetch('/api/reset', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
                     },
-                    body: JSON.stringify({ action: 'reset_conversation' }) // Add explicit action
+                    body: JSON.stringify({ action: 'reset_conversation' }),
+                    signal: controller.signal
                 });
 
+                clearTimeout(timeoutId);
+
                 if (!resetResponse.ok) {
-                    throw new Error(`Reset failed: ${resetResponse.status}`);
+                    const errorText = await resetResponse.text();
+                    throw new Error(`Reset failed: ${resetResponse.status} - ${errorText}`);
                 }
 
                 const resetData = await resetResponse.json();
                 console.log("✅ Server reset response:", resetData);
                 
+                // Validate response
+                if (!resetData.success) {
+                    throw new Error(`Server reset failed: ${resetData.message || 'Unknown error'}`);
+                }
+                
                 // Handle new session token if provided
                 if (resetData.new_session_token) {
                     console.log("🔄 Received new session token, updating cookie");
                     // The cookie is automatically set by the server response
-                    // No need to manually update it
                 }
                 
-                // STEP 2: Wait longer for server to fully reset
-                await new Promise(resolve => setTimeout(resolve, 1000));
+                // STEP 2: Wait for server to fully reset
+                await new Promise(resolve => setTimeout(resolve, 500)); // Reduced wait time
                 
                 // STEP 3: Clear frontend state completely
                 window.ChatState = {
@@ -1780,33 +1819,45 @@
                     sendInProgress: false
                 };
                 
-                // STEP 4: Clear UI
-                const chatMessages = document.getElementById('chatMessages');
-                chatMessages.innerHTML = `
-                    <div class="welcome-message">
-                        <h2>🏥 Welcome to MedBot AI</h2>
-                        <p>I'm here to help you with medical questions and health concerns. Describe your symptoms and I'll guide you to the right specialist.</p>
-                    </div>
-                `;
-                
-                // Clear active chat indicators
-                document.querySelectorAll('.chat-item').forEach(item => {
-                    item.classList.remove('active');
-                });
-                
-                // Reset input
-                const messageInput = document.getElementById('messageInput');
-                messageInput.value = '';
-                messageInput.style.height = 'auto';
-                messageInput.disabled = false;
-                
-                const sendButton = document.getElementById('sendButton');
-                sendButton.disabled = false;
-                
-                // Hide typing indicator if visible
-                hideTypingIndicator();
-                
-                messageInput.focus();
+                // STEP 4: Clear UI with error handling
+                try {
+                    const chatMessages = document.getElementById('chatMessages');
+                    if (chatMessages) {
+                        chatMessages.innerHTML = `
+                            <div class="welcome-message">
+                                <h2>🏥 Welcome to MedBot AI</h2>
+                                <p>I'm here to help you with medical questions and health concerns. Describe your symptoms and I'll guide you to the right specialist.</p>
+                            </div>
+                        `;
+                    }
+                    
+                    // Clear active chat indicators
+                    document.querySelectorAll('.chat-item').forEach(item => {
+                        item.classList.remove('active');
+                    });
+                    
+                    // Reset input with error handling
+                    const messageInput = document.getElementById('messageInput');
+                    if (messageInput) {
+                        messageInput.value = '';
+                        messageInput.style.height = 'auto';
+                        messageInput.disabled = false;
+                        messageInput.focus();
+                    }
+                    
+                    const sendButton = document.getElementById('sendButton');
+                    if (sendButton) {
+                        sendButton.disabled = false;
+                    }
+                    
+                    // Hide typing indicator if visible
+                    if (typeof hideTypingIndicator === 'function') {
+                        hideTypingIndicator();
+                    }
+                    
+                } catch (uiError) {
+                    console.warn("⚠️ UI update error (non-critical):", uiError);
+                }
                 
                 console.log("✅ New chat started successfully");
                 console.log("📊 Final state:", JSON.stringify(window.ChatState));
@@ -1814,9 +1865,36 @@
                 
             } catch (error) {
                 console.error("❌ Error starting new chat:", error);
-                showStatus("Error starting new chat - " + error.message, "error");
-            } finally {
+                
+                // Determine error type and show appropriate message
+                let errorMessage = "Error starting new chat";
+                if (error.name === 'AbortError') {
+                    errorMessage = "Request timed out. Please try again.";
+                } else if (error.message.includes('Failed to fetch')) {
+                    errorMessage = "Network error. Please check your connection.";
+                } else if (error.message.includes('Reset failed')) {
+                    errorMessage = "Server error. Please refresh the page.";
+                } else {
+                    errorMessage = `Error: ${error.message}`;
+                }
+                
+                showStatus(errorMessage, "error");
+                
+                // Reset the flag even on error to allow retry
                 window.ChatState.resetInProgress = false;
+                
+            } finally {
+                // Ensure resetInProgress is always cleared
+                window.ChatState.resetInProgress = false;
+                
+                // Re-enable button
+                const newChatBtn = document.getElementById('newChatBtn');
+                if (newChatBtn) {
+                    newChatBtn.disabled = false;
+                    newChatBtn.innerHTML = '<i class="fas fa-plus"></i> New Chat';
+                }
+                
+                console.log("🔄 Reset process completed");
             }
         }
 
