@@ -1,0 +1,87 @@
+{
+    "app_title": "ಮೆಡ್‌ಬಾಟ್ AI - ವೈದ್ಯಕೀಯ ಸಹಾಯಕ",
+    "welcome_message": "ಮೆಡ್‌ಬಾಟ್ AI ಗೆ ಸ್ವಾಗತ",
+    "welcome_description": "ನಿಮ್ಮ ಬುದ್ಧಿವಂತ ವೈದ್ಯಕೀಯ ಸಹಾಯಕ. ನಿಮ್ಮ ರೋಗಲಕ್ಷಣಗಳನ್ನು ವಿವರಿಸಿ ಮತ್ತು ಸರಿಯಾದ ತಜ್ಞರನ್ನು ಹುಡುಕಲು ನಾನು ಸಹಾಯ ಮಾಡುತ್ತೇನೆ.",
+    
+    "nav_dashboard": "ಡ್ಯಾಶ್‌ಬೋರ್ಡ್",
+    "nav_chat": "ಚಾಟ್",
+    "nav_skin_analyzer": "ಚರ್ಮ ವಿಶ್ಲೇಷಕ",
+    "nav_logout": "ಲಾಗ್ ಔಟ್",
+    
+    "login_title": "ಮೆಡ್‌ಬಾಟ್‌ಗೆ ಲಾಗಿನ್ ಮಾಡಿ",
+    "login_username": "ಬಳಕೆದಾರ ಹೆಸರು",
+    "login_password": "ಪಾಸ್‌ವರ್ಡ್",
+    "login_button": "ಲಾಗಿನ್",
+    "login_register_link": "ಖಾತೆ ಇಲ್ಲವೇ? ಇಲ್ಲಿ ನೋಂದಾಯಿಸಿ",
+    
+    "register_title": "ಮೆಡ್‌ಬಾಟ್‌ಗಾಗಿ ನೋಂದಾಯಿಸಿ",
+    "register_username": "ಬಳಕೆದಾರ ಹೆಸರು",
+    "register_email": "ಇಮೇಲ್",
+    "register_password": "ಪಾಸ್‌ವರ್ಡ್",
+    "register_full_name": "ಪೂರ್ಣ ಹೆಸರು",
+    "register_button": "ನೋಂದಾಯಿಸಿ",
+    "register_login_link": "ಈಗಾಗಲೇ ಖಾತೆ ಇದೆಯೇ? ಇಲ್ಲಿ ಲಾಗಿನ್ ಮಾಡಿ",
+    
+    "chat_title": "ವೈದ್ಯಕೀಯ ಸಹಾಯಕ",
+    "chat_subtitle": "ನಿಮ್ಮ ಆರೋಗ್ಯದ ಕಾಳಜಿಗಳ ಬಗ್ಗೆ ನನ್ನನ್ನು ಕೇಳಿ",
+    "chat_input_placeholder": "ನಿಮ್ಮ ರೋಗಲಕ್ಷಣಗಳನ್ನು ವಿವರಿಸಿ ಅಥವಾ ವೈದ್ಯಕೀಯ ಪ್ರಶ್ನೆ ಕೇಳಿ...",
+    "chat_send": "ಕಳುಹಿಸಿ",
+    "chat_new": "ಹೊಸ ಚಾಟ್",
+    "chat_clear_all": "ಎಲ್ಲವನ್ನೂ ತೆರವುಗೊಳಿಸಿ",
+    "chat_history": "ಚಾಟ್ ಇತಿಹಾಸ",
+    
+    "doctor_sort_rating": "ಅತ್ಯುನ್ನತ ರೇಟಿಂಗ್",
+    "doctor_sort_experience": "ಹೆಚ್ಚು ಅನುಭವ",
+    "doctor_sort_location": "ಹತ್ತಿರದ ಸ್ಥಳ",
+    
+    "doctor_table_name": "ವೈದ್ಯರ ಹೆಸರು",
+    "doctor_table_specialty": "ವಿಶೇಷತೆ",
+    "doctor_table_experience": "ಅನುಭವ",
+    "doctor_table_rating": "ರೇಟಿಂಗ್",
+    "doctor_table_fee": "ಸಲಹೆ ಶುಲ್ಕ",
+    "doctor_table_location": "ಸ್ಥಳ",
+    "doctor_table_contact": "ಸಂಪರ್ಕ",
+    
+    "medical_recommendation_prefix": "ನಿಮ್ಮ ರೋಗಲಕ್ಷಣಗಳ ಆಧಾರದ ಮೇಲೆ, ನಾನು ಸಲಹೆ ನೀಡುತ್ತೇನೆ",
+    "doctor_list_title": "ನಿಮ್ಮ ಪ್ರದೇಶದಲ್ಲಿ ಅರ್ಹ {specialty} ವೈದ್ಯರು ಇಲ್ಲಿದ್ದಾರೆ:",
+    
+    "email_subject": "ಮೆಡ್‌ಬಾಟ್‌ನಿಂದ ವೈದ್ಯರ ಶಿಫಾರಸುಗಳು",
+    "email_button": "ಇಮೇಲ್ ಶಿಫಾರಸುಗಳು",
+    "email_sent": "ಶಿಫಾರಸುಗಳನ್ನು ನಿಮ್ಮ ಇಮೇಲ್‌ಗೆ ಕಳುಹಿಸಲಾಗಿದೆ!",
+    
+    "status_ready": "ಸಿದ್ಧ",
+    "status_connecting": "ಸಂಪರ್ಕಿಸುತ್ತಿದೆ...",
+    "status_error": "ದೋಷ ಸಂಭವಿಸಿದೆ",
+    "status_success": "ಯಶಸ್ಸು",
+    
+    "voice_listening": "ಕೇಳುತ್ತಿದೆ...",
+    "voice_not_supported": "ಧ್ವನಿ ಗುರುತಿಸುವಿಕೆ ಬೆಂಬಲಿತವಾಗಿಲ್ಲ",
+    
+    "loading": "ಲೋಡ್ ಆಗುತ್ತಿದೆ...",
+    "delete": "ಅಳಿಸಿ",
+    "cancel": "ರದ್ದುಮಾಡಿ",
+    "confirm": "ದೃಢೀಕರಿಸಿ",
+    
+    "error_network": "ನೆಟ್‌ವರ್ಕ್ ದೋಷ. ದಯವಿಟ್ಟು ನಿಮ್ಮ ಸಂಪರ್ಕವನ್ನು ಪರಿಶೀಲಿಸಿ.",
+    "error_server": "ಸರ್ವರ್ ದೋಷ. ದಯವಿಟ್ಟು ನಂತರ ಪುನಃ ಪ್ರಯತ್ನಿಸಿ.",
+    "error_invalid_input": "ದಯವಿಟ್ಟು ಮಾನ್ಯವಾದ ಇನ್‌ಪುಟ್ ಒದಗಿಸಿ.",
+    
+    "symptoms_severity": "ರೋಗಲಕ್ಷಣದ ತೀವ್ರತೆ (1-10):",
+    "symptoms_duration": "ಈ ರೋಗಲಕ್ಷಣಗಳು ನಿಮಗೆ ಎಷ್ಟು ಕಾಲದಿಂದ ಇವೆ?",
+    "symptoms_additional": "ಯಾವುದೇ ಹೆಚ್ಚುವರಿ ರೋಗಲಕ್ಷಣಗಳು?",
+    
+    "specialist_types": {
+        "cardiologist": "ಹೃದಯ ರೋಗ ತಜ್ಞ",
+        "orthopedist": "ಮೂಳೆ ರೋಗ ತಜ್ಞ",
+        "neurologist": "ನರರೋಗ ತಜ್ಞ",
+        "dermatologist": "ಚರ್ಮ ರೋಗ ತಜ್ಞ",
+        "gastroenterologist": "ಜೀರ್ಣಾಂಗ ತಜ್ಞ",
+        "gynecologist": "ಸ್ತ್ರೀ ರೋಗ ತಜ್ಞ",
+        "pediatrician": "ಮಕ್ಕಳ ರೋಗ ತಜ್ಞ",
+        "psychiatrist": "ಮನೋವೈದ್ಯ",
+        "general-physician": "ಸಾಮಾನ್ಯ ವೈದ್ಯ"
+    },
+    
+    "language_selector": "ಭಾಷೆ ಆಯ್ಕೆಮಾಡಿ",
+    "language_changed": "ಭಾಷೆಯನ್ನು ಕನ್ನಡಕ್ಕೆ ಬದಲಾಯಿಸಲಾಗಿದೆ"
+}

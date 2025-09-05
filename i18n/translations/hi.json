@@ -1,0 +1,87 @@
+{
+    "app_title": "मेडबॉट AI - चिकित्सा सहायक",
+    "welcome_message": "मेडबॉट AI में आपका स्वागत है",
+    "welcome_description": "आपका बुद्धिमान चिकित्सा सहायक। अपने लक्षणों का वर्णन करें और मैं आपको सही विशेषज्ञ खोजने में मदद करूंगा।",
+    
+    "nav_dashboard": "डैशबोर्ड",
+    "nav_chat": "चैट",
+    "nav_skin_analyzer": "त्वचा विश्लेषक",
+    "nav_logout": "लॉग आउट",
+    
+    "login_title": "मेडबॉट में लॉगिन करें",
+    "login_username": "उपयोगकर्ता नाम",
+    "login_password": "पासवर्ड",
+    "login_button": "लॉगिन",
+    "login_register_link": "कोई खाता नहीं है? यहाँ पंजीकरण करें",
+    
+    "register_title": "मेडबॉट के लिए पंजीकरण करें",
+    "register_username": "उपयोगकर्ता नाम",
+    "register_email": "ईमेल",
+    "register_password": "पासवर्ड",
+    "register_full_name": "पूरा नाम",
+    "register_button": "पंजीकरण करें",
+    "register_login_link": "पहले से खाता है? यहाँ लॉगिन करें",
+    
+    "chat_title": "चिकित्सा सहायक",
+    "chat_subtitle": "अपनी स्वास्थ्य संबंधी चिंताओं के बारे में मुझसे पूछें",
+    "chat_input_placeholder": "अपने लक्षणों का वर्णन करें या कोई चिकित्सा प्रश्न पूछें...",
+    "chat_send": "भेजें",
+    "chat_new": "नई चैट",
+    "chat_clear_all": "सभी साफ़ करें",
+    "chat_history": "चैट इतिहास",
+    
+    "doctor_sort_rating": "उच्चतम रेटिंग",
+    "doctor_sort_experience": "सबसे अधिक अनुभव",
+    "doctor_sort_location": "निकटतम स्थान",
+    
+    "doctor_table_name": "डॉक्टर का नाम",
+    "doctor_table_specialty": "विशेषता",
+    "doctor_table_experience": "अनुभव",
+    "doctor_table_rating": "रेटिंग",
+    "doctor_table_fee": "परामर्श शुल्क",
+    "doctor_table_location": "स्थान",
+    "doctor_table_contact": "संपर्क",
+    
+    "medical_recommendation_prefix": "आपके लक्षणों के आधार पर, मैं सलाह देता हूं कि आप",
+    "doctor_list_title": "यहाँ आपके क्षेत्र में योग्य {specialty} डॉक्टर हैं:",
+    
+    "email_subject": "मेडबॉट से डॉक्टर की सिफारिशें",
+    "email_button": "ईमेल सिफारिशें",
+    "email_sent": "सिफारिशें आपके ईमेल पर भेजी गईं!",
+    
+    "status_ready": "तैयार",
+    "status_connecting": "कनेक्ट हो रहा है...",
+    "status_error": "त्रुटि हुई",
+    "status_success": "सफलता",
+    
+    "voice_listening": "सुन रहा है...",
+    "voice_not_supported": "वॉयस पहचान समर्थित नहीं है",
+    
+    "loading": "लोड हो रहा है...",
+    "delete": "मिटाएं",
+    "cancel": "रद्द करें",
+    "confirm": "पुष्टि करें",
+    
+    "error_network": "नेटवर्क त्रुटि। कृपया अपना कनेक्शन जांचें।",
+    "error_server": "सर्वर त्रुटि। कृपया बाद में पुनः प्रयास करें।",
+    "error_invalid_input": "कृपया मान्य इनपुट प्रदान करें।",
+    
+    "symptoms_severity": "लक्षण की गंभीरता (1-10):",
+    "symptoms_duration": "आपको ये लक्षण कब से हैं?",
+    "symptoms_additional": "कोई अतिरिक्त लक्षण?",
+    
+    "specialist_types": {
+        "cardiologist": "हृदय रोग विशेषज्ञ",
+        "orthopedist": "हड्डी रोग विशेषज्ञ",
+        "neurologist": "न्यूरोलॉजिस्ट",
+        "dermatologist": "त्वचा रोग विशेषज्ञ",
+        "gastroenterologist": "गैस्ट्रोएंटेरोलॉजिस्ट",
+        "gynecologist": "स्त्री रोग विशेषज्ञ",
+        "pediatrician": "बाल रोग विशेषज्ञ",
+        "psychiatrist": "मनोचिकित्सक",
+        "general-physician": "सामान्य चिकित्सक"
+    },
+    
+    "language_selector": "भाषा चुनें",
+    "language_changed": "भाषा हिंदी में बदली गई"
+}

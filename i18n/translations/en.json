@@ -1,0 +1,87 @@
+{
+    "app_title": "MedBot AI - Medical Assistant",
+    "welcome_message": "Welcome to MedBot AI",
+    "welcome_description": "Your intelligent medical assistant. Describe your symptoms and I'll help you find the right specialist.",
+    
+    "nav_dashboard": "Dashboard",
+    "nav_chat": "Chat",
+    "nav_skin_analyzer": "Skin Analyzer",
+    "nav_logout": "Logout",
+    
+    "login_title": "Login to MedBot",
+    "login_username": "Username",
+    "login_password": "Password",
+    "login_button": "Login",
+    "login_register_link": "Don't have an account? Register here",
+    
+    "register_title": "Register for MedBot",
+    "register_username": "Username",
+    "register_email": "Email",
+    "register_password": "Password",
+    "register_full_name": "Full Name",
+    "register_button": "Register",
+    "register_login_link": "Already have an account? Login here",
+    
+    "chat_title": "Medical Assistant",
+    "chat_subtitle": "Ask me about your health concerns",
+    "chat_input_placeholder": "Describe your symptoms or ask a medical question...",
+    "chat_send": "Send",
+    "chat_new": "New Chat",
+    "chat_clear_all": "Clear All",
+    "chat_history": "Chat History",
+    
+    "doctor_sort_rating": "Highest Rating",
+    "doctor_sort_experience": "Most Experience", 
+    "doctor_sort_location": "Nearest Location",
+    
+    "doctor_table_name": "Doctor Name",
+    "doctor_table_specialty": "Specialty",
+    "doctor_table_experience": "Experience",
+    "doctor_table_rating": "Rating",
+    "doctor_table_fee": "Consultation Fee",
+    "doctor_table_location": "Location",
+    "doctor_table_contact": "Contact",
+    
+    "medical_recommendation_prefix": "Based on your symptoms, I recommend consulting a",
+    "doctor_list_title": "Here are qualified {specialty} doctors in your area:",
+    
+    "email_subject": "Doctor Recommendations from MedBot",
+    "email_button": "Email Recommendations",
+    "email_sent": "Recommendations sent to your email!",
+    
+    "status_ready": "Ready",
+    "status_connecting": "Connecting...",
+    "status_error": "Error occurred",
+    "status_success": "Success",
+    
+    "voice_listening": "Listening...",
+    "voice_not_supported": "Voice recognition not supported",
+    
+    "loading": "Loading...",
+    "delete": "Delete",
+    "cancel": "Cancel",
+    "confirm": "Confirm",
+    
+    "error_network": "Network error. Please check your connection.",
+    "error_server": "Server error. Please try again later.",
+    "error_invalid_input": "Please provide valid input.",
+    
+    "symptoms_severity": "Symptom severity (1-10):",
+    "symptoms_duration": "How long have you had these symptoms?",
+    "symptoms_additional": "Any additional symptoms?",
+    
+    "specialist_types": {
+        "cardiologist": "Cardiologist",
+        "orthopedist": "Orthopedist", 
+        "neurologist": "Neurologist",
+        "dermatologist": "Dermatologist",
+        "gastroenterologist": "Gastroenterologist",
+        "gynecologist": "Gynecologist",
+        "pediatrician": "Pediatrician",
+        "psychiatrist": "Psychiatrist",
+        "general-physician": "General Physician"
+    },
+    
+    "language_selector": "Select Language",
+    "language_changed": "Language changed to English"
+}
