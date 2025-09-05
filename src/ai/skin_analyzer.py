@@ -1,7 +1,7 @@
 # src/ai/skin_analyzer.py
 """
-Skin Condition Image Analyzer
-AI-powered analysis of skin conditions from images
+Enhanced Skin Condition Image Analyzer
+AI-powered analysis of skin conditions from images with advanced ML models
 """
 import io
 import base64
@@ -9,6 +9,15 @@ import logging
 from typing import Dict, List, Any, Optional
 from PIL import Image
 import random
+
+# Import the advanced medical analyzer
+try:
+    from src.ai.advanced_medical_analyzer import analyze_medical_image, TORCH_AVAILABLE
+    ADVANCED_ANALYZER_AVAILABLE = True
+    print("✅ Advanced medical analyzer available")
+except ImportError:
+    ADVANCED_ANALYZER_AVAILABLE = False
+    print("⚠️ Advanced medical analyzer not available, using basic analyzer")
 
 # Import the medical recommender for doctor suggestions
 try:
@@ -237,7 +246,8 @@ class SkinConditionAnalyzer:
     
     def analyze_skin_condition(self, image_data: bytes, user_city: str = None) -> Dict[str, Any]:
         """
-        Main method to analyze skin condition from image
+        Enhanced main method to analyze skin condition from image
+        Uses advanced ML models when available, falls back to basic analysis
         
         Args:
             image_data: Raw image bytes
@@ -245,6 +255,100 @@ class SkinConditionAnalyzer:
             
         Returns:
             Analysis results with conditions, specialist recommendations, and doctors
+        """
+        try:
+            # Try advanced analysis first if available
+            if ADVANCED_ANALYZER_AVAILABLE:
+                return self._analyze_with_advanced_models(image_data, user_city)
+            else:
+                return self._analyze_with_basic_model(image_data, user_city)
+                
+        except Exception as e:
+            self.logger.error(f"Error analyzing skin condition: {e}")
+            return {
+                "success": False,
+                "error": f"Analysis failed: {str(e)}"
+            }
+    
+    def _analyze_with_advanced_models(self, image_data: bytes, user_city: str = None) -> Dict[str, Any]:
+        """
+        Analyze using advanced deep learning models
+        """
+        try:
+            # Use the advanced medical analyzer
+            advanced_result = analyze_medical_image(image_data, analysis_type='both')
+            
+            if not advanced_result['success']:
+                # Fall back to basic analysis
+                return self._analyze_with_basic_model(image_data, user_city)
+            
+            # Extract conditions from advanced analysis
+            conditions = []
+            specialist_type = "Dermatologist"
+            
+            # Process cancer analysis results
+            if 'cancer_analysis' in advanced_result:
+                cancer_conditions = advanced_result['cancer_analysis'].get('conditions', [])
+                for condition in cancer_conditions[:3]:  # Top 3 cancer-related
+                    conditions.append({
+                        "name": condition['condition'],
+                        "confidence": condition['confidence'],
+                        "description": self._get_condition_description(condition['condition']),
+                        "risk_level": condition.get('risk_level', 'LOW'),
+                        "urgency": condition.get('urgency', 'LOW')
+                    })
+            
+            # Process general analysis results
+            if 'general_analysis' in advanced_result:
+                general_conditions = advanced_result['general_analysis'].get('conditions', [])
+                for condition in general_conditions[:3]:  # Top 3 general conditions
+                    conditions.append({
+                        "name": condition['condition'],
+                        "confidence": condition['confidence'],
+                        "description": self._get_condition_description(condition['condition']),
+                        "severity": condition.get('severity', 'MODERATE'),
+                        "treatment_urgency": condition.get('treatment_urgency', 'ROUTINE')
+                    })
+            
+            # Sort by confidence and remove duplicates
+            seen_conditions = set()
+            unique_conditions = []
+            for condition in sorted(conditions, key=lambda x: x['confidence'], reverse=True):
+                if condition['name'] not in seen_conditions:
+                    unique_conditions.append(condition)
+                    seen_conditions.add(condition['name'])
+            
+            conditions = unique_conditions[:5]  # Top 5 unique conditions
+            
+            # Get doctor recommendations
+            doctors = self.get_doctor_recommendations(specialist_type, user_city)
+            
+            # Create enhanced response
+            return {
+                "success": True,
+                "analysis": {
+                    "conditions": conditions,
+                    "specialist_type": specialist_type,
+                    "doctors": doctors,
+                    "image_quality": advanced_result.get('image_quality', 0.8),
+                    "overall_assessment": advanced_result.get('overall_assessment', ''),
+                    "recommendations": {
+                        "cancer": advanced_result.get('cancer_analysis', {}).get('recommendation', ''),
+                        "general": advanced_result.get('general_analysis', {}).get('recommendation', '')
+                    },
+                    "analysis_type": "Advanced AI Analysis",
+                    "model_info": advanced_result.get('model_info', {})
+                }
+            }
+            
+        except Exception as e:
+            self.logger.error(f"Advanced analysis failed: {e}")
+            # Fall back to basic analysis
+            return self._analyze_with_basic_model(image_data, user_city)
+    
+    def _analyze_with_basic_model(self, image_data: bytes, user_city: str = None) -> Dict[str, Any]:
+        """
+        Basic analysis using the original mock model (fallback)
         """
         try:
             # Validate image
@@ -286,16 +390,78 @@ class SkinConditionAnalyzer:
                     "image_info": {
                         "dimensions": validation_result["dimensions"],
                         "format": validation_result["format"]
-                    }
+                    },
+                    "analysis_type": "Basic Analysis",
+                    "note": "For more accurate analysis, please ensure advanced AI models are installed."
                 }
             }
             
         except Exception as e:
-            self.logger.error(f"Error analyzing skin condition: {e}")
+            self.logger.error(f"Basic analysis failed: {e}")
             return {
                 "success": False,
                 "error": f"Analysis failed: {str(e)}"
             }
+    
+    def _get_condition_description(self, condition_name: str) -> str:
+        """
+        Get detailed description for medical conditions
+        """
+        descriptions = {
+            # Cancer-related
+            "Melanoma": "A serious form of skin cancer that develops in melanocytes. Requires immediate medical attention.",
+            "Basal Cell Carcinoma": "The most common form of skin cancer, usually not life-threatening but requires treatment.",
+            "Squamous Cell Carcinoma": "A common form of skin cancer that can spread if not treated promptly.",
+            "Actinic Keratosis": "Precancerous skin patches caused by sun damage that may develop into cancer.",
+            
+            # General skin conditions
+            "Eczema": "Inflammatory skin condition causing itchy, red, swollen skin patches.",
+            "Psoriasis": "Autoimmune condition causing scaly, inflamed skin patches that may be chronic.",
+            "Acne": "Common skin condition causing pimples, blackheads, and blemishes.",
+            "Dermatitis": "General term for skin inflammation that can have various causes.",
+            "Rosacea": "Chronic skin condition causing redness and visible blood vessels on the face.",
+            "Contact Dermatitis": "Skin reaction caused by contact with irritants or allergens.",
+            "Seborrheic Dermatitis": "Common skin condition causing scaly patches and red skin.",
+            "Fungal Infection": "Skin infection caused by fungi, often requiring antifungal treatment.",
+            
+            # Additional conditions
+            "Benign Keratosis": "Non-cancerous skin growth that is generally harmless.",
+            "Dermatofibroma": "Small, benign skin nodule that is usually harmless.",
+            "Melanocytic Nevus": "Common mole that is typically benign but should be monitored."
+        }
+        
+        return descriptions.get(condition_name, "A skin condition that requires professional medical evaluation.")
+        
+    def get_enhanced_doctor_recommendations(self, conditions: List[Dict], user_city: str = None) -> List[Dict[str, Any]]:
+        """
+        Enhanced doctor recommendations based on detected conditions
+        """
+        # Check if any urgent conditions are detected
+        urgent_conditions = [c for c in conditions if c.get('urgency') == 'URGENT' or c.get('risk_level') == 'HIGH']
+        
+        # Get specialist type based on conditions
+        specialist_type = "Dermatologist"
+        
+        # If cancer risk detected, prioritize oncological dermatologists
+        cancer_conditions = ['Melanoma', 'Basal Cell Carcinoma', 'Squamous Cell Carcinoma']
+        has_cancer_risk = any(c['name'] in cancer_conditions for c in conditions)
+        
+        if has_cancer_risk:
+            specialist_type = "Dermatologist (Oncology)"
+        
+        # Get basic doctor recommendations
+        doctors = self.get_doctor_recommendations(specialist_type, user_city)
+        
+        # Add urgency information
+        for doctor in doctors:
+            if urgent_conditions:
+                doctor['urgency_note'] = "⚠️ URGENT: Please seek immediate consultation"
+            elif has_cancer_risk:
+                doctor['urgency_note'] = "🔍 Priority: Cancer risk assessment needed"
+            else:
+                doctor['urgency_note'] = "📅 Routine: Schedule at your convenience"
+        
+        return doctors
 
 # Global analyzer instance
 skin_analyzer = SkinConditionAnalyzer()

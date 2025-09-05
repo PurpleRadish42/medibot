@@ -1,0 +1,223 @@
+<!-- Example of how to update your chat.html template -->
+<!-- Add this after your existing head section -->
+
+<!-- Include language selector component -->
+{% include 'components/language_selector.html' %}
+
+<!-- Update your welcome message section -->
+<div class="welcome-message">
+    <h2 data-translate="welcome_message">🏥 Welcome to MedBot AI</h2>
+    <p data-translate="welcome_description">
+        Your intelligent medical assistant. Describe your symptoms and I'll help you find the right specialist.
+    </p>
+</div>
+
+<!-- Update chat header -->
+<div class="chat-header">
+    <div style="display: flex; align-items: center; gap: 1rem;">
+        <button class="toggle-sidebar" onclick="toggleSidebar()">
+            <i class="fas fa-bars"></i>
+        </button>
+        <div>
+            <h2><i class="fas fa-robot"></i> <span data-translate="chat_title">Medical Assistant</span></h2>
+            <small data-translate="chat_subtitle">Ask me about your health concerns</small>
+        </div>
+    </div>
+    
+    <!-- Add language selector to header -->
+    <div style="display: flex; gap: 1rem; flex-wrap: wrap; align-items: center;">
+        {% include 'components/language_selector.html' %}
+        
+        <!-- Existing doctor settings dropdown -->
+        <div class="doctor-settings">
+            <label for="sortPreference" data-translate="doctor_sort_label">Sort doctors by:</label>
+            <select id="sortPreference" class="sort-dropdown" onchange="handleSortChange()">
+                <option value="rating" data-translate="doctor_sort_rating">Highest Rating</option>
+                <option value="experience" data-translate="doctor_sort_experience">Most Experience</option>
+                <option value="location" data-translate="doctor_sort_location">Nearest Location</option>
+            </select>
+        </div>
+    </div>
+</div>
+
+<!-- Update sidebar -->
+<div class="sidebar-header">
+    <h3><i class="fas fa-history"></i> <span data-translate="chat_history">Chat History</span></h3>
+    <button class="new-chat-btn" onclick="startNewChat()">
+        <i class="fas fa-plus"></i> <span data-translate="chat_new">New Chat</span>
+    </button>
+    <button class="clear-all-btn" onclick="clearAllChats()">
+        <i class="fas fa-trash-alt"></i> <span data-translate="chat_clear_all">Clear All</span>
+    </button>
+</div>
+
+<!-- Update input area -->
+<div class="input-wrapper">
+    <textarea 
+        class="chat-input" 
+        id="messageInput" 
+        data-translate="chat_input_placeholder"
+        placeholder="Describe your symptoms or ask a medical question..."
+        rows="1"
+        onkeydown="handleKeyPress(event)"
+        oninput="autoResize(this)"
+    ></textarea>
+    <button class="mic-button" id="micButton" onclick="toggleSpeechRecognition()" data-translate="voice_button" title="Voice Input">
+        <i class="fas fa-microphone"></i>
+    </button>
+    <button class="send-button" id="sendButton" onclick="sendMessage()" data-translate="chat_send" title="Send Message">
+        <i class="fas fa-paper-plane"></i>
+    </button>
+</div>
+
+<!-- Update speech status -->
+<div class="speech-status" id="speechStatus" style="display: none;">
+    <div class="speech-status-content">
+        <i class="fas fa-microphone-alt"></i>
+        <span id="speechStatusText" data-translate="voice_listening">🎙️ Listening...</span>
+    </div>
+</div>
+
+<!-- Enhanced JavaScript for multilingual support -->
+<script>
+// Enhanced message sending with language support
+async function sendMessage() {
+    if (window.ChatState.sendInProgress || window.ChatState.resetInProgress) {
+        console.log("⏳ Message sending in progress, ignoring duplicate request");
+        return;
+    }
+
+    const messageInput = document.getElementById('messageInput');
+    const message = messageInput.value.trim();
+    
+    if (!message) {
+        showStatus(window.LanguageManager.getText('error_invalid_input'), 'error');
+        return;
+    }
+
+    try {
+        window.ChatState.sendInProgress = true;
+        
+        // Disable input
+        messageInput.disabled = true;
+        const sendButton = document.getElementById('sendButton');
+        sendButton.disabled = true;
+        
+        // Add user message
+        addMessage(message, true);
+        messageInput.value = '';
+        messageInput.style.height = 'auto';
+        
+        // Show typing indicator
+        showTypingIndicator();
+        
+        // Get user location and sort preference
+        const sortPreference = document.getElementById('sortPreference').value;
+        
+        // Send request with language context
+        const response = await fetch('/api/chat', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Accept-Language': window.LanguageManager.currentLanguage
+            },
+            body: JSON.stringify({
+                message: message,
+                sort_preference: sortPreference,
+                user_location: window.ChatState.userLocation,
+                language: window.LanguageManager.currentLanguage
+            })
+        });
+        
+        hideTypingIndicator();
+        
+        if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.error || window.LanguageManager.getText('error_server'));
+        }
+        
+        const data = await response.json();
+        addMessage(data.response, false);
+        
+        // Update chat history in UI
+        updateChatHistoryAfterMessage(message);
+        
+        showStatus(window.LanguageManager.getText('status_success'), 'success');
+        
+    } catch (error) {
+        hideTypingIndicator();
+        console.error('❌ Error sending message:', error);
+        
+        const errorMessage = error.message.includes('Failed to fetch') 
+            ? window.LanguageManager.getText('error_network')
+            : error.message;
+            
+        addMessage(
+            `${window.LanguageManager.getText('error_server')}: ${errorMessage}`, 
+            false
+        );
+        showStatus(errorMessage, 'error');
+        
+    } finally {
+        // Re-enable input
+        messageInput.disabled = false;
+        sendButton.disabled = false;
+        messageInput.focus();
+        window.ChatState.sendInProgress = false;
+    }
+}
+
+// Enhanced voice recognition with language support
+function setupSpeechRecognition() {
+    if ('SpeechRecognition' in window || 'webkitSpeechRecognition' in window) {
+        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+        window.recognition = new SpeechRecognition();
+        
+        // Set language based on current selection
+        const langMap = {
+            'en': 'en-US',
+            'hi': 'hi-IN',
+            'kn': 'kn-IN',
+            'ta': 'ta-IN',
+            'te': 'te-IN',
+            'ml': 'ml-IN',
+            'bn': 'bn-IN',
+            'gu': 'gu-IN',
+            'mr': 'mr-IN',
+            'pa': 'pa-IN'
+        };
+        
+        window.recognition.lang = langMap[window.LanguageManager.currentLanguage] || 'en-US';
+        window.recognition.continuous = false;
+        window.recognition.interimResults = false;
+        
+        window.recognition.onresult = function(event) {
+            const transcript = event.results[0][0].transcript;
+            document.getElementById('messageInput').value = transcript;
+            autoResize(document.getElementById('messageInput'));
+        };
+        
+        window.recognition.onerror = function(event) {
+            console.error('Speech recognition error:', event.error);
+            showStatus(window.LanguageManager.getText('voice_not_supported'), 'error');
+        };
+        
+        window.recognition.onend = function() {
+            document.getElementById('speechStatus').style.display = 'none';
+            document.getElementById('micButton').classList.remove('recording');
+        };
+    }
+}
+
+// Initialize speech recognition when language changes
+document.addEventListener('DOMContentLoaded', function() {
+    setupSpeechRecognition();
+    
+    // Re-setup speech recognition when language changes
+    const originalChangeLanguage = window.changeLanguage;
+    window.changeLanguage = async function() {
+        await originalChangeLanguage();
+        setupSpeechRecognition();
+    };
+});
+</script>
