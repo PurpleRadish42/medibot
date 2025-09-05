@@ -154,16 +154,24 @@ class EmailService:
                     margin: 20px 0;
                     font-size: 14px;
                 }}
+                /* Table container with horizontal scroll */
+                .table-container {{
+                    overflow-x: auto !important;
+                    margin: 20px 0 !important;
+                    border-radius: 8px !important;
+                    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1) !important;
+                    background: white !important;
+                }}
+                
                 /* Override table styles for email */
                 table {{
-                    width: 100% !important;
+                    width: max-content !important;
+                    min-width: 100% !important;
                     border-collapse: collapse !important;
-                    margin: 20px 0 !important;
+                    margin: 0 !important;
                     font-size: 14px !important;
                     background: white !important;
                     border-radius: 8px !important;
-                    overflow: hidden !important;
-                    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1) !important;
                 }}
                 th {{
                     background: linear-gradient(45deg, #4facfe, #00f2fe) !important;
@@ -173,13 +181,29 @@ class EmailService:
                     font-weight: bold !important;
                     font-size: 13px !important;
                     border: 1px solid #dee2e6 !important;
+                    white-space: nowrap !important;
+                    min-width: 80px !important;
                 }}
                 td {{
                     padding: 10px 8px !important;
                     border: 1px solid #dee2e6 !important;
                     font-size: 13px !important;
                     vertical-align: top !important;
+                    white-space: nowrap !important;
+                    min-width: 80px !important;
                 }}
+                /* Specific column widths for better layout */
+                td:nth-child(1), th:nth-child(1) {{ min-width: 40px !important; }} /* # column */
+                td:nth-child(2), th:nth-child(2) {{ min-width: 150px !important; }} /* Doctor Name */
+                td:nth-child(3), th:nth-child(3) {{ min-width: 100px !important; }} /* Specialty */
+                td:nth-child(4), th:nth-child(4) {{ min-width: 120px !important; }} /* Qualification */
+                td:nth-child(5), th:nth-child(5) {{ min-width: 80px !important; }} /* Experience */
+                td:nth-child(6), th:nth-child(6) {{ min-width: 100px !important; }} /* Fee */
+                td:nth-child(7), th:nth-child(7) {{ min-width: 60px !important; }} /* Rating */
+                td:nth-child(8), th:nth-child(8) {{ min-width: 80px !important; }} /* Distance */
+                td:nth-child(9), th:nth-child(9) {{ min-width: 150px !important; }} /* Location */
+                td:nth-child(10), th:nth-child(10) {{ min-width: 100px !important; }} /* Profile */
+                td:nth-child(11), th:nth-child(11) {{ min-width: 100px !important; }} /* Maps */
                 tr:nth-child(even) {{
                     background-color: #f8f9fa !important;
                 }}
@@ -211,7 +235,9 @@ class EmailService:
                     
                     <div class="recommendations">
                         <h2>👨‍⚕️ Recommended Doctors</h2>
-                        {table_content}
+                        <div class="table-container">
+                            {table_content}
+                        </div>
                     </div>
                     
                     <div class="disclaimer">

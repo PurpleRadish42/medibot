@@ -343,56 +343,6 @@
             transform: translateY(-2px);
         }
 
-        .settings-prompt {
-            background: rgba(79, 172, 254, 0.3) !important;
-        }
-
-        .settings-prompt:hover {
-            background: rgba(79, 172, 254, 0.5) !important;
-        }
-
-        /* Doctor Settings */
-        .doctor-settings {
-            background: rgba(255, 255, 255, 0.15);
-            backdrop-filter: blur(10px);
-            border-radius: 15px;
-            padding: 1rem;
-            margin: 1rem 0;
-            border: 1px solid rgba(255, 255, 255, 0.2);
-            animation: slideDown 0.3s ease;
-        }
-
-        .settings-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 1rem;
-            color: white;
-        }
-
-        .settings-header h4 {
-            font-size: 1rem;
-            margin: 0;
-        }
-
-        .close-settings {
-            background: none;
-            border: none;
-            color: white;
-            cursor: pointer;
-            padding: 0.25rem;
-            border-radius: 50%;
-            width: 30px;
-            height: 30px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            transition: all 0.3s ease;
-        }
-
-        .close-settings:hover {
-            background: rgba(255, 255, 255, 0.2);
-        }
 
         .location-prompt {
             background: #f8f9fa;
@@ -1031,30 +981,8 @@
                     <div class="quick-prompt" onclick="sendQuickPrompt('I have back pain')">
                         <i class="fas fa-user-injured"></i> Back pain
                     </div>
-                    <div class="quick-prompt settings-prompt" onclick="showDoctorSettings()">
-                        <i class="fas fa-cog"></i> Doctor Settings
-                    </div>
                 </div>
                 
-                <!-- Doctor Recommendation Settings -->
-                <div class="doctor-settings" id="doctorSettings" style="display: none;">
-                    <div class="settings-header">
-                        <h4><i class="fas fa-user-md"></i> Doctor Recommendation Settings</h4>
-                        <button class="close-settings" onclick="hideDoctorSettings()">
-                            <i class="fas fa-times"></i>
-                        </button>
-                    </div>
-                    <div class="settings-content">
-                        <div class="sort-section">
-                            <label for="sortPreference">Sort doctors by:</label>
-                            <select id="sortPreference" class="sort-dropdown" onchange="handleSortChange()">
-                                <option value="rating">Highest Rating</option>
-                                <option value="experience">Most Experience</option>
-                                <option value="location">Nearest Location</option>
-                            </select>
-                        </div>
-                    </div>
-                </div>
                 
                 <div class="input-wrapper">
                     <textarea 
@@ -1134,35 +1062,7 @@
             return new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
         }
 
-        // Doctor Settings Functions
-        function showDoctorSettings() {
-            const settingsDiv = document.getElementById('doctorSettings');
-            settingsDiv.style.display = 'block';
-            updateSortPreference();
-        }
 
-        function hideDoctorSettings() {
-            const settingsDiv = document.getElementById('doctorSettings');
-            settingsDiv.style.display = 'none';
-        }
-
-        function updateSortPreference() {
-            const sortDropdown = document.getElementById('sortPreference');
-            sortDropdown.value = window.ChatState.doctorSortPreference;
-        }
-
-        // Handle sort preference change - DYNAMIC UPDATING
-        function handleSortChange() {
-            const sortDropdown = document.getElementById('sortPreference');
-            window.ChatState.doctorSortPreference = sortDropdown.value;
-            const sortText = sortDropdown.options[sortDropdown.selectedIndex].text;
-            
-            showStatus(`Sort preference updated: ${sortText}`, 'success');
-            console.log('🔄 Sort preference changed to:', window.ChatState.doctorSortPreference);
-            
-            // Dynamically update the last doctor recommendation with new sorting
-            updateLastDoctorRecommendation();
-        }
 
         // Function to dynamically update the last doctor recommendation with new sorting
         function updateLastDoctorRecommendation() {
@@ -1757,8 +1657,7 @@
                 
                 const requestBody = { 
                     message: message,
-                    chatId: window.ChatState.currentChatId, // Include chat ID for context
-                    sortPreference: window.ChatState.doctorSortPreference
+                    chatId: window.ChatState.currentChatId // Include chat ID for context
                 };
                 
                 // Include location if available
