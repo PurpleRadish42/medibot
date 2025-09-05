@@ -91,7 +91,7 @@ def login_required(f):
     return decorated_function
 
 # Fallback medical response function
-def fallback_medical_response(message, sort_preference="rating", user_location=None):
+def fallback_medical_response(message, sort_preference="rating", user_location=None, show_table=True):
     """Fallback response when medical AI is not available - WITH DOCTOR RECOMMENDATIONS"""
     
     # Try to provide doctor recommendations even without OpenAI
@@ -168,7 +168,13 @@ def fallback_medical_response(message, sort_preference="rating", user_location=N
                 specialist_name = recommended_specialist.replace("_", " ").title()
                 response = f"<p>I understand you're having {message.lower()}. Let me help you find the right specialist for your condition.</p>\n"
                 response += f"<p>Based on your symptoms, I recommend consulting a <strong>{specialist_name}</strong>.</p>\n"
-                response += dr.format_doctor_recommendations(doctors, specialist_name)
+                
+                if show_table:
+                    response += dr.format_doctor_recommendations(doctors, specialist_name)
+                else:
+                    # Just show the recommendation without table - location prompt will handle the table
+                    response += f"<p>I can help you find {specialist_name.lower()}s in your area. Would you like to see nearby doctors or all available doctors?</p>"
+                
                 return response
         
         # No specialist match found
@@ -179,7 +185,7 @@ def fallback_medical_response(message, sort_preference="rating", user_location=N
             user_lng = user_location.get('longitude')
             
         doctors = dr.recommend_doctors(
-            "general physician", 
+            "general-physician", 
             "Bangalore", 
             limit=2, 
             sort_by=sort_preference,
@@ -215,7 +221,7 @@ def fallback_medical_response(message, sort_preference="rating", user_location=N
         try:
             from doctor_recommender import DoctorRecommender
             dr = DoctorRecommender()
-            doctors = dr.recommend_doctors("general physician", "Bangalore", limit=2)
+            doctors = dr.recommend_doctors("general-physician", "Bangalore", limit=2)
             if doctors:
                 response = "<p>I understand you have medical concerns. While our AI assistant is temporarily unavailable, I can help you find medical care.</p>\n"
                 response += "<p>I recommend starting with a <strong>General Physician</strong> who can evaluate your condition and refer you to a specialist if needed.</p>\n"
@@ -498,11 +504,11 @@ def api_chat():
                 import traceback
                 traceback.print_exc()
                 print("🔄 Falling back to doctor recommendations system")
-                response = fallback_medical_response(message, sort_preference, user_location)
+                response = fallback_medical_response(message, sort_preference, user_location, show_table=False)
                 user_conversations[user_id].append((message, response))
         else:
             print("⚠ MedicalRecommender not available, using fallback system")
-            response = fallback_medical_response(message, sort_preference, user_location)
+            response = fallback_medical_response(message, sort_preference, user_location, show_table=False)
             user_conversations[user_id].append((message, response))
         
         print(f"✅ Generated response: {response[:100]}...")
@@ -1287,6 +1293,53 @@ def api_delete_conversation(conversation_id):
     except Exception as e:
         print(f"Delete conversation error: {e}")
         return jsonify({'error': 'Failed to delete conversation'}), 500
+
+@app.route('/api/doctors/sort', methods=['POST'])
+@login_required
+def api_sort_doctors():
+    """Dynamic doctor sorting endpoint"""
+    try:
+        data = request.get_json()
+        specialty = data.get('specialty', '').strip()
+        sort_by = data.get('sort_by', 'rating')
+        user_location = data.get('userLocation', None)
+        user_city = data.get('city', 'Bangalore')
+        
+        if not specialty:
+            return jsonify({'error': 'Specialty is required'}), 400
+        
+        print(f"🔄 Dynamic sorting request: {specialty} by {sort_by}")
+        
+        # Use fallback medical response to get doctor recommendations
+        response = fallback_medical_response(
+            f"Show me {specialty} recommendations", 
+            sort_preference=sort_by, 
+            user_location=user_location
+        )
+        
+        # If this is a location-based request, ensure the response includes location info
+        if sort_by == "location" and user_location:
+            # Add location context to the response
+            response = response.replace(
+                "Based on your symptoms, I recommend consulting a",
+                f"Based on your symptoms and your location ({user_location.get('latitude', 0):.4f}, {user_location.get('longitude', 0):.4f}), I recommend consulting a"
+            )
+        
+        return jsonify({
+            'success': True,
+            'response': response,
+            'specialty': specialty,
+            'sort_by': sort_by
+        })
+        
+    except Exception as e:
+        print(f"❌ Dynamic sorting error: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({
+            'success': False,
+            'error': 'Failed to sort doctors'
+        }), 500
 
 # ============================================
 # Application Startup

@@ -394,39 +394,53 @@
             background: rgba(255, 255, 255, 0.2);
         }
 
-        .location-section {
-            margin-bottom: 1rem;
+        .location-prompt {
+            background: #f8f9fa;
+            border: 2px solid #4facfe;
+            border-radius: 10px;
+            padding: 1rem;
+            margin: 1rem 0;
+            text-align: center;
         }
 
-        .location-status {
+        .location-prompt h3 {
+            color: #4facfe;
+            margin: 0 0 0.5rem 0;
+        }
+
+        .location-prompt p {
+            color: #666;
+            margin: 0 0 1rem 0;
+        }
+
+        .location-prompt-buttons {
             display: flex;
-            align-items: center;
-            gap: 0.5rem;
-            color: white;
-            font-size: 0.9rem;
+            gap: 1rem;
+            justify-content: center;
         }
 
-        .location-btn {
+        .location-prompt-btn {
             background: #4facfe;
             color: white;
             border: none;
-            padding: 0.5rem 1rem;
-            border-radius: 20px;
+            padding: 0.75rem 1.5rem;
+            border-radius: 25px;
             cursor: pointer;
-            font-size: 0.8rem;
+            font-size: 0.9rem;
             transition: all 0.3s ease;
-            margin-left: auto;
         }
 
-        .location-btn:hover {
+        .location-prompt-btn:hover {
             background: #0084ff;
             transform: translateY(-1px);
         }
 
-        .location-btn:disabled {
+        .location-prompt-btn.secondary {
             background: #6c757d;
-            cursor: not-allowed;
-            transform: none;
+        }
+
+        .location-prompt-btn.secondary:hover {
+            background: #5a6268;
         }
 
         .sort-section {
@@ -1031,16 +1045,6 @@
                         </button>
                     </div>
                     <div class="settings-content">
-                        <div class="location-section">
-                            <div class="location-status" id="locationStatus">
-                                <i class="fas fa-map-marker-alt"></i>
-                                <span id="locationText">Location not detected</span>
-                                <button class="location-btn" id="locationBtn" onclick="requestLocation()">
-                                    <i class="fas fa-crosshairs"></i> Get Location
-                                </button>
-                            </div>
-                        </div>
-                        
                         <div class="sort-section">
                             <label for="sortPreference">Sort doctors by:</label>
                             <select id="sortPreference" class="sort-dropdown" onchange="handleSortChange()">
@@ -1134,7 +1138,6 @@
         function showDoctorSettings() {
             const settingsDiv = document.getElementById('doctorSettings');
             settingsDiv.style.display = 'block';
-            updateLocationDisplay();
             updateSortPreference();
         }
 
@@ -1143,80 +1146,12 @@
             settingsDiv.style.display = 'none';
         }
 
-        function updateLocationDisplay() {
-            const locationText = document.getElementById('locationText');
-            const locationBtn = document.getElementById('locationBtn');
-            
-            if (window.ChatState.userLocation) {
-                locationText.textContent = `Location detected (${window.ChatState.userLocation.latitude.toFixed(4)}, ${window.ChatState.userLocation.longitude.toFixed(4)})`;
-                locationBtn.innerHTML = '<i class="fas fa-check"></i> Location Set';
-                locationBtn.disabled = false;
-                locationBtn.style.background = '#28a745';
-            } else {
-                locationText.textContent = 'Location not detected';
-                locationBtn.innerHTML = '<i class="fas fa-crosshairs"></i> Get Location';
-                locationBtn.disabled = false;
-                locationBtn.style.background = '#4facfe';
-            }
-        }
-
         function updateSortPreference() {
             const sortDropdown = document.getElementById('sortPreference');
             sortDropdown.value = window.ChatState.doctorSortPreference;
         }
 
-        function requestLocation() {
-            const locationBtn = document.getElementById('locationBtn');
-            const locationText = document.getElementById('locationText');
-            
-            if (!navigator.geolocation) {
-                alert('Geolocation is not supported by this browser.');
-                return;
-            }
-
-            locationBtn.disabled = true;
-            locationBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Getting Location...';
-            locationText.textContent = 'Requesting location permission...';
-
-            navigator.geolocation.getCurrentPosition(
-                function(position) {
-                    window.ChatState.userLocation = {
-                        latitude: position.coords.latitude,
-                        longitude: position.coords.longitude,
-                        accuracy: position.coords.accuracy
-                    };
-                    updateLocationDisplay();
-                    showStatus('Location detected successfully!', 'success');
-                    console.log('📍 User location:', window.ChatState.userLocation);
-                },
-                function(error) {
-                    let errorMessage = 'Location access denied or failed.';
-                    switch(error.code) {
-                        case error.PERMISSION_DENIED:
-                            errorMessage = 'Location access denied by user.';
-                            break;
-                        case error.POSITION_UNAVAILABLE:
-                            errorMessage = 'Location information is unavailable.';
-                            break;
-                        case error.TIMEOUT:
-                            errorMessage = 'Location request timed out.';
-                            break;
-                    }
-                    locationText.textContent = errorMessage;
-                    locationBtn.disabled = false;
-                    locationBtn.innerHTML = '<i class="fas fa-crosshairs"></i> Try Again';
-                    showStatus(errorMessage, 'error');
-                    console.log('❌ Location error:', error);
-                },
-                {
-                    enableHighAccuracy: true,
-                    timeout: 10000,
-                    maximumAge: 300000 // 5 minutes
-                }
-            );
-        }
-
-        // Handle sort preference change
+        // Handle sort preference change - DYNAMIC UPDATING
         function handleSortChange() {
             const sortDropdown = document.getElementById('sortPreference');
             window.ChatState.doctorSortPreference = sortDropdown.value;
@@ -1225,12 +1160,12 @@
             showStatus(`Sort preference updated: ${sortText}`, 'success');
             console.log('🔄 Sort preference changed to:', window.ChatState.doctorSortPreference);
             
-            // If there's a recent doctor recommendation, refresh it with new sorting
-            refreshLastDoctorRecommendation();
+            // Dynamically update the last doctor recommendation with new sorting
+            updateLastDoctorRecommendation();
         }
 
-        // Function to refresh the last doctor recommendation with new sorting
-        function refreshLastDoctorRecommendation() {
+        // Function to dynamically update the last doctor recommendation with new sorting
+        function updateLastDoctorRecommendation() {
             // Find the last bot message that contains a doctor table
             const botMessages = document.querySelectorAll('.message.bot');
             for (let i = botMessages.length - 1; i >= 0; i--) {
@@ -1252,7 +1187,7 @@
                     else if (content.includes('psychiatrist')) specialty = 'psychiatrist';
                     
                     if (specialty) {
-                        console.log(`🔄 Refreshing ${specialty} recommendations with ${window.ChatState.doctorSortPreference} sorting`);
+                        console.log(`🔄 Dynamically updating ${specialty} recommendations with ${window.ChatState.doctorSortPreference} sorting`);
                         requestUpdatedDoctorRecommendations(specialty, messageContent);
                         return;
                     }
@@ -1267,17 +1202,17 @@
                 showStatus('Updating recommendations...', 'info');
                 
                 const requestBody = {
-                    message: `Show me ${specialty} recommendations sorted by ${window.ChatState.doctorSortPreference}`,
-                    chatId: window.ChatState.currentChatId,
-                    sortPreference: window.ChatState.doctorSortPreference
+                    specialty: specialty,
+                    sort_by: window.ChatState.doctorSortPreference,
+                    city: 'Bangalore'
                 };
                 
                 // Include location if available
-                if (window.ChatState.userLocation) {
+            if (window.ChatState.userLocation) {
                     requestBody.userLocation = window.ChatState.userLocation;
                 }
                 
-                const response = await fetch('/api/chat', {
+                const response = await fetch('/api/doctors/sort', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
@@ -1292,7 +1227,7 @@
                 const data = await response.json();
                 
                 // Update the message content with new sorted recommendations
-                if (data.response) {
+                if (data.success && data.response) {
                     messageElement.innerHTML = data.response;
                     
                     // Re-add email button if it was there
@@ -1302,6 +1237,8 @@
                     }
                     
                     showStatus('Recommendations updated successfully!', 'success');
+            } else {
+                    throw new Error(data.error || 'No response received');
                 }
                 
             } catch (error) {
@@ -1313,6 +1250,242 @@
         // Helper function to detect if content contains doctor recommendations
         function hasDoctorRecommendations(content) {
             return content.includes('Important Notes:') && content.includes('<table');
+        }
+
+        // Location prompt functions - NEW APPROACH: Ask location FIRST
+        function showLocationPromptFirst() {
+            // Check if location prompt already exists
+            if (document.getElementById('locationPrompt')) {
+                return;
+            }
+
+            const locationPrompt = document.createElement('div');
+            locationPrompt.id = 'locationPrompt';
+            locationPrompt.className = 'location-prompt';
+            locationPrompt.innerHTML = `
+                <h3><i class="fas fa-map-marker-alt"></i> Find Nearby Doctors?</h3>
+                <p>Would you like to see doctors sorted by distance from your location?</p>
+                <div class="location-prompt-buttons">
+                    <button class="location-prompt-btn" onclick="requestLocationAndShowDoctors()">
+                        <i class="fas fa-crosshairs"></i> Yes, Use My Location
+                    </button>
+                    <button class="location-prompt-btn secondary" onclick="showDoctorsWithoutLocation()">
+                        <i class="fas fa-times"></i> No, Show All Doctors
+                    </button>
+                </div>
+            `;
+
+            // Add to the last bot message
+            const botMessages = document.querySelectorAll('.message.bot');
+            if (botMessages.length > 0) {
+                const lastBotMessage = botMessages[botMessages.length - 1];
+                const messageContent = lastBotMessage.querySelector('.message-content');
+                if (messageContent) {
+                    messageContent.appendChild(locationPrompt);
+                }
+            }
+        }
+
+        function hideLocationPrompt() {
+            const locationPrompt = document.getElementById('locationPrompt');
+            if (locationPrompt) {
+                locationPrompt.remove();
+            }
+        }
+
+        function requestLocationAndShowDoctors() {
+            if (!navigator.geolocation) {
+                alert('Geolocation is not supported by this browser.');
+                showDoctorsWithoutLocation();
+                return;
+            }
+
+            const locationBtn = document.querySelector('#locationPrompt .location-prompt-btn');
+            const originalText = locationBtn.innerHTML;
+
+            locationBtn.disabled = true;
+            locationBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Getting Location...';
+
+            navigator.geolocation.getCurrentPosition(
+                function(position) {
+                    window.ChatState.userLocation = {
+                        latitude: position.coords.latitude,
+                        longitude: position.coords.longitude,
+                        accuracy: position.coords.accuracy
+                    };
+                    
+                    console.log('📍 User location:', window.ChatState.userLocation);
+                    showStatus('Location detected! Loading nearby doctors...', 'success');
+                    
+                    // Show doctors with location-based sorting
+                    showDoctorsWithLocation();
+                    hideLocationPrompt();
+                },
+                function(error) {
+                    let errorMessage = 'Location access denied or failed.';
+                    switch(error.code) {
+                        case error.PERMISSION_DENIED:
+                            errorMessage = 'Location access denied by user.';
+                            break;
+                        case error.POSITION_UNAVAILABLE:
+                            errorMessage = 'Location information is unavailable.';
+                            break;
+                        case error.TIMEOUT:
+                            errorMessage = 'Location request timed out.';
+                            break;
+                    }
+                    
+                    locationBtn.disabled = false;
+                    locationBtn.innerHTML = originalText;
+                    showStatus(errorMessage, 'error');
+                    console.log('❌ Location error:', error);
+                    
+                    // Fallback to showing doctors without location
+                    showDoctorsWithoutLocation();
+                },
+                {
+                    enableHighAccuracy: true,
+                    timeout: 10000,
+                    maximumAge: 300000 // 5 minutes
+                }
+            );
+        }
+
+        function showDoctorsWithoutLocation() {
+            console.log('📋 Showing doctors without location');
+            hideLocationPrompt();
+            
+            // Get the specialty from the current bot message
+            const specialty = extractSpecialtyFromCurrentMessage();
+            if (specialty) {
+                // Set sort preference to rating (default)
+                window.ChatState.doctorSortPreference = 'rating';
+                showDoctorsWithFilters(specialty, 'rating');
+            }
+        }
+
+        function showDoctorsWithLocation() {
+            console.log('📍 Showing doctors with location');
+            
+            // Get the specialty from the current bot message
+            const specialty = extractSpecialtyFromCurrentMessage();
+                    if (specialty) {
+                // Set sort preference to location
+                window.ChatState.doctorSortPreference = 'location';
+                showDoctorsWithFilters(specialty, 'location');
+            }
+        }
+
+        function extractSpecialtyFromCurrentMessage() {
+            const botMessages = document.querySelectorAll('.message.bot');
+            if (botMessages.length > 0) {
+                const lastBotMessage = botMessages[botMessages.length - 1];
+                const messageContent = lastBotMessage.querySelector('.message-content');
+                if (messageContent) {
+                    const content = messageContent.innerHTML.toLowerCase();
+                    if (content.includes('neurologist')) return 'neurologist';
+                    else if (content.includes('cardiologist')) return 'cardiologist';
+                    else if (content.includes('orthopedist')) return 'orthopedist';
+                    else if (content.includes('dermatologist')) return 'dermatologist';
+                    else if (content.includes('gynecologist')) return 'gynecologist';
+                    else if (content.includes('pediatrician')) return 'pediatrician';
+                    else if (content.includes('general physician')) return 'general physician';
+                    else if (content.includes('dentist')) return 'dentist';
+                    else if (content.includes('ophthalmologist')) return 'ophthalmologist';
+                    else if (content.includes('psychiatrist')) return 'psychiatrist';
+                }
+            }
+            return 'general physician'; // fallback
+        }
+
+        async function showDoctorsWithFilters(specialty, sortBy) {
+            try {
+                showStatus('Loading doctor recommendations...', 'info');
+                
+                const requestBody = {
+                    specialty: specialty,
+                    sort_by: sortBy,
+                    city: 'Bangalore'
+                };
+                
+                // Include location if available
+                if (window.ChatState.userLocation) {
+                    requestBody.userLocation = window.ChatState.userLocation;
+                }
+                
+                const response = await fetch('/api/doctors/sort', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(requestBody)
+                });
+
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}`);
+                }
+
+                const data = await response.json();
+                
+                if (data.success && data.response) {
+                    // Replace the current bot message content with the new doctor recommendations
+                    const botMessages = document.querySelectorAll('.message.bot');
+                    if (botMessages.length > 0) {
+                        const lastBotMessage = botMessages[botMessages.length - 1];
+                        const messageContent = lastBotMessage.querySelector('.message-content');
+                        if (messageContent) {
+                            // Add filter controls on top
+                            const filterControls = createFilterControls(specialty, sortBy);
+                            messageContent.innerHTML = filterControls + data.response;
+                            
+                            // Add email button
+                    if (hasDoctorRecommendations(data.response)) {
+                        const emailButton = createEmailButton(data.response);
+                                messageContent.appendChild(emailButton);
+                            }
+                        }
+                    }
+                    
+                    showStatus('Doctor recommendations loaded!', 'success');
+                } else {
+                    throw new Error(data.error || 'No response received');
+                }
+                
+            } catch (error) {
+                console.error('❌ Error loading doctor recommendations:', error);
+                showStatus('Failed to load doctor recommendations', 'error');
+            }
+        }
+
+        function createFilterControls(specialty, currentSort) {
+            return `
+                <div class="doctor-filters" style="margin-bottom: 1rem; padding: 1rem; background: #f8f9fa; border-radius: 8px; border: 1px solid #dee2e6;">
+                    <div style="display: flex; align-items: center; gap: 1rem; flex-wrap: wrap;">
+                        <div style="display: flex; align-items: center; gap: 0.5rem;">
+                            <i class="fas fa-filter" style="color: #4facfe;"></i>
+                            <span style="font-weight: bold; color: #333;">Filter by:</span>
+                        </div>
+                        <select id="doctorSortFilter" class="sort-dropdown" onchange="updateDoctorFilter('${specialty}')" style="padding: 0.5rem; border: 1px solid #ccc; border-radius: 4px; background: white;">
+                            <option value="rating" ${currentSort === 'rating' ? 'selected' : ''}>Highest Rating</option>
+                            <option value="experience" ${currentSort === 'experience' ? 'selected' : ''}>Most Experience</option>
+                            <option value="location" ${currentSort === 'location' ? 'selected' : ''}>Nearest Location</option>
+                        </select>
+                        <div style="font-size: 0.9rem; color: #666;">
+                            <i class="fas fa-user-md"></i> ${specialty.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())}s
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
+        async function updateDoctorFilter(specialty) {
+            const sortDropdown = document.getElementById('doctorSortFilter');
+            const newSort = sortDropdown.value;
+            
+            console.log(`🔄 Updating filter: ${specialty} by ${newSort}`);
+            window.ChatState.doctorSortPreference = newSort;
+            
+            await showDoctorsWithFilters(specialty, newSort);
         }
 
         // Helper function to create email button
@@ -1619,6 +1792,11 @@
                 addMessage(botResponse);
                 updateChatHistory();
                 
+                // Check if this response contains doctor recommendations and prompt for location FIRST
+                if (hasDoctorRecommendations(botResponse)) {
+                    showLocationPromptFirst();
+                }
+                
                 // If database is available, refresh the sidebar to show updated conversation
                 if (window.ChatState.isServerReady) {
                     console.log("🔄 Refreshing sidebar from database...");
@@ -1747,14 +1925,14 @@
         function updateChatHistory() {
             // Only save to localStorage if database is not available
             if (!window.ChatState.isServerReady) {
-                if (window.ChatState.chatHistory.length > 0) {
-                    // Create a chat session title from the first user message
-                    const firstUserMessage = window.ChatState.chatHistory.find(msg => msg.isUser);
-                    const title = firstUserMessage ? 
-                        firstUserMessage.content.substring(0, 30) + (firstUserMessage.content.length > 30 ? '...' : '') :
-                        'New Chat';
-                    
-                    saveChatSession(title);
+            if (window.ChatState.chatHistory.length > 0) {
+                // Create a chat session title from the first user message
+                const firstUserMessage = window.ChatState.chatHistory.find(msg => msg.isUser);
+                const title = firstUserMessage ? 
+                    firstUserMessage.content.substring(0, 30) + (firstUserMessage.content.length > 30 ? '...' : '') :
+                    'New Chat';
+                
+                saveChatSession(title);
                 }
             } else {
                 console.log("📊 Database available, skipping localStorage chat saving");

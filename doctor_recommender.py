@@ -49,27 +49,40 @@ class DoctorRecommender:
             "pulmonologist": "pulmonologist",
             "rheumatologist": "rheumatologist",
             "urologist": "urologist",
+            
+            # FIXED: General physician mappings
+            "general physician": "general-physician",
             "general practitioner": "general-physician",
             "gp": "general-physician",
+            "family doctor": "general-physician",
+            "primary care": "general-physician",
+            
+            # FIXED: ENT specialist mappings
             "ent specialist": "ent-specialist",
+            "ent": "ent-specialist",
+            "ear nose throat": "ent-specialist",
+            
+            # Other specialists
             "endocrinologist": "endocrinologist",
             "nephrologist": "nephrologist",
             "oncologist": "oncologist",
             
+            # FIXED: Surgeon mappings (with hyphens)
+            "cardiac surgeon": "cardiac-surgeon",
+            "plastic surgeon": "plastic-surgeon",
+            "vascular surgeon": "vascular-surgeon",
+            
             # Additional mappings for database specialties
             "dentist": "dentist",
             "ayurveda": "ayurveda",
-            "cardiac surgeon": "cardiac-surgeon",
             "anesthesiologist": "anesthesiologist",
             "neurosurgeon": "neurosurgeon",
-            "plastic surgeon": "plastic-surgeon",
             "pathologist": "pathologist",
             "radiologist": "radiologist",
             "sexologist": "sexologist",
             "surgeon": "surgeon",
             "trichologist": "trichologist",
-            "unani": "unani",
-            "vascular surgeon": "vascular-surgeon"
+            "unani": "unani"
         }
         
         self.load_doctors_data()
@@ -245,25 +258,48 @@ class DoctorRecommender:
         }
     
     def find_specialty_match(self, recommended_specialist: str) -> str:
-        """Find exact matching specialty in CSV - SIMPLIFIED"""
+        """Find exact matching specialty in database - ENHANCED"""
         recommended_lower = recommended_specialist.lower().strip()
         
         print(f"🔍 Looking for: '{recommended_specialist}'")
         
-        # Direct mapping to exact CSV specialty
+        # Direct mapping to exact database specialty
         if recommended_lower in self.specialty_mapping:
             exact_specialty = self.specialty_mapping[recommended_lower]
             print(f"✅ Found mapping: '{recommended_specialist}' → '{exact_specialty}'")
             return exact_specialty
         
-        # Fallback: try partial matching
+        # Enhanced fallback: try multiple matching strategies
         available_specialties = self.doctors_df['speciality'].unique()
+        
+        # Strategy 1: Exact match (case insensitive)
+        for specialty in available_specialties:
+            if recommended_lower == specialty.lower():
+                print(f"✅ Found exact match: '{specialty}'")
+                return specialty
+        
+        # Strategy 2: Contains match (recommended_specialist in specialty)
         for specialty in available_specialties:
             if recommended_lower in specialty.lower():
-                print(f"✅ Found partial match: '{specialty}'")
+                print(f"✅ Found contains match: '{specialty}'")
+                return specialty
+        
+        # Strategy 3: Reverse contains match (specialty in recommended_specialist)
+        for specialty in available_specialties:
+            if specialty.lower() in recommended_lower:
+                print(f"✅ Found reverse contains match: '{specialty}'")
+                return specialty
+        
+        # Strategy 4: Word-based matching (split by spaces/hyphens)
+        recommended_words = recommended_lower.replace('-', ' ').split()
+        for specialty in available_specialties:
+            specialty_words = specialty.lower().replace('-', ' ').split()
+            if any(word in specialty_words for word in recommended_words):
+                print(f"✅ Found word-based match: '{specialty}'")
                 return specialty
         
         print(f"❌ No match found for '{recommended_specialist}'")
+        print(f"📋 Available specialties: {list(available_specialties)}")
         return None
     
     def recommend_doctors(self, specialist_type: str, city: str = None, limit: int = 5, sort_by: str = "rating", user_lat: float = None, user_lng: float = None) -> List[Dict]:
