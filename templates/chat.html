@@ -1618,6 +1618,13 @@
                 console.log("🤖 Bot response:", botResponse);
                 addMessage(botResponse);
                 updateChatHistory();
+                
+                // If database is available, refresh the sidebar to show updated conversation
+                if (window.ChatState.isServerReady) {
+                    console.log("🔄 Refreshing sidebar from database...");
+                    loadDatabaseChatHistory();
+                }
+                
                 showStatus("Message sent successfully", "success");
                 
             } catch (error) {
@@ -1676,6 +1683,13 @@
                 const resetData = await resetResponse.json();
                 console.log("✅ Server reset response:", resetData);
                 
+                // Handle new session token if provided
+                if (resetData.new_session_token) {
+                    console.log("🔄 Received new session token, updating cookie");
+                    // The cookie is automatically set by the server response
+                    // No need to manually update it
+                }
+                
                 // STEP 2: Wait longer for server to fully reset
                 await new Promise(resolve => setTimeout(resolve, 1000));
                 
@@ -1731,14 +1745,19 @@
 
         // Update chat history in sidebar
         function updateChatHistory() {
-            if (window.ChatState.chatHistory.length > 0) {
-                // Create a chat session title from the first user message
-                const firstUserMessage = window.ChatState.chatHistory.find(msg => msg.isUser);
-                const title = firstUserMessage ? 
-                    firstUserMessage.content.substring(0, 30) + (firstUserMessage.content.length > 30 ? '...' : '') :
-                    'New Chat';
-                
-                saveChatSession(title);
+            // Only save to localStorage if database is not available
+            if (!window.ChatState.isServerReady) {
+                if (window.ChatState.chatHistory.length > 0) {
+                    // Create a chat session title from the first user message
+                    const firstUserMessage = window.ChatState.chatHistory.find(msg => msg.isUser);
+                    const title = firstUserMessage ? 
+                        firstUserMessage.content.substring(0, 30) + (firstUserMessage.content.length > 30 ? '...' : '') :
+                        'New Chat';
+                    
+                    saveChatSession(title);
+                }
+            } else {
+                console.log("📊 Database available, skipping localStorage chat saving");
             }
         }
 
@@ -2151,8 +2170,8 @@
             
             // Sort messages by order and timestamp to ensure proper sequence
             const sortedMessages = dbMessages.sort((a, b) => {
-                if (a.order !== b.order) {
-                    return (a.order || 0) - (b.order || 0);
+                if (a.message_order !== b.message_order) {
+                    return (a.message_order || 0) - (b.message_order || 0);
                 }
                 return new Date(a.timestamp || 0) - new Date(b.timestamp || 0);
             });
@@ -2246,6 +2265,10 @@
         function displayChatSessions(chatSessions) {
             const chatHistoryContainer = document.getElementById('chatHistory');
             
+            // Clear existing chats first to prevent duplicates
+            chatHistoryContainer.innerHTML = '';
+            console.log(`🧹 Cleared sidebar, displaying ${chatSessions.length} chat sessions`);
+            
             chatSessions.forEach(chat => {
                 const chatItem = document.createElement('div');
                 chatItem.className = 'chat-item';
@@ -2275,6 +2298,10 @@
         function loadSavedChats() {
             const savedChats = JSON.parse(localStorage.getItem('medbot_chats') || '[]');
             const chatHistoryContainer = document.getElementById('chatHistory');
+            
+            // Clear existing chats first to prevent duplicates
+            chatHistoryContainer.innerHTML = '';
+            console.log(`🧹 Cleared sidebar, loading ${savedChats.length} saved chats from localStorage`);
             
             savedChats.forEach(chat => {
                 const chatItem = document.createElement('div');
@@ -2376,12 +2403,12 @@
             // Load chat history from database (primary source)
             if (apiStatus) {
                 await loadDatabaseChatHistory();
+                console.log("✅ Database conversations loaded, skipping localStorage");
             } else {
                 console.warn("⚠ API offline, loading from localStorage only");
+                // Only load from localStorage if database is not available
+                loadSavedChats();
             }
-            
-            // Load any remaining chats from localStorage (fallback/legacy)
-            loadSavedChats();
             
             // Focus on input
             document.getElementById('messageInput').focus();

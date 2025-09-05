@@ -578,7 +578,7 @@ def api_chat():
 @app.route('/api/reset', methods=['POST'])
 @login_required
 def api_reset():
-    """API endpoint to reset conversation - PROPERLY FIXED"""
+    """API endpoint to reset conversation - PROPERLY FIXED WITH NEW CONVERSATION ID"""
     try:
         user_id = request.user['id']
         
@@ -593,7 +593,41 @@ def api_reset():
         user_conversations[user_id] = []
         print(f"✅ Re-initialized empty conversation for user {user_id}")
         
-        # 3. Reset the MedicalRecommender instance if needed
+        # 3. Create a NEW conversation ID for the user session
+        session_token = request.cookies.get('session_token')
+        if session_token:
+            try:
+                # Create a new session with a new conversation ID
+                new_session_token = auth_db.create_session(user_id)
+                if new_session_token:
+                    print(f"✅ Created new session with new conversation ID")
+                    
+                    # Return the new session token so frontend can update the cookie
+                    response = make_response(jsonify({
+                        'success': True,
+                        'message': 'Conversation reset successfully with new conversation ID',
+                        'user_id': user_id,
+                        'conversation_cleared': True,
+                        'new_session_token': new_session_token,
+                        'recommender_reset': medical_functions_available
+                    }))
+                    
+                    # Set the new session cookie
+                    response.set_cookie(
+                        'session_token', 
+                        new_session_token, 
+                        httponly=True,
+                        secure=False,  # Set to True in production with HTTPS
+                        samesite='Lax'
+                    )
+                    
+                    return response
+                else:
+                    print("⚠️ Failed to create new session, continuing with existing session")
+            except Exception as e:
+                print(f"⚠️ Failed to create new session: {e}, continuing with existing session")
+        
+        # 4. Reset the MedicalRecommender instance if needed
         global medical_recommender
         if medical_functions_available:
             try:
