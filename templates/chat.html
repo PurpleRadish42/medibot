@@ -3,8 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Chat - MediGuide AI</title>
+    <title>Chat - MedBot AI</title>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
     <style>
         * {
             margin: 0;
@@ -12,27 +13,68 @@
             box-sizing: border-box;
         }
 
+        :root {
+            --primary-gradient: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            --accent-gradient: linear-gradient(45deg, #4facfe, #00f2fe);
+            --card-bg: rgba(255, 255, 255, 0.08);
+            --card-hover-bg: rgba(255, 255, 255, 0.12);
+            --text-primary: #ffffff;
+            --text-secondary: rgba(255, 255, 255, 0.8);
+            --text-muted: rgba(255, 255, 255, 0.6);
+            --border-color: rgba(255, 255, 255, 0.15);
+            --shadow-light: 0 8px 32px rgba(0, 0, 0, 0.1);
+            --shadow-medium: 0 16px 48px rgba(0, 0, 0, 0.15);
+            --shadow-heavy: 0 24px 64px rgba(0, 0, 0, 0.2);
+            --border-radius: 20px;
+            --border-radius-lg: 24px;
+            --transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
         body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            background: var(--primary-gradient);
             height: 100vh;
             overflow: hidden;
+        }
+
+        /* Animated background */
+        body::before {
+            content: '';
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: 
+                radial-gradient(circle at 20% 80%, rgba(120, 119, 198, 0.2) 0%, transparent 50%),
+                radial-gradient(circle at 80% 20%, rgba(255, 119, 198, 0.2) 0%, transparent 50%),
+                radial-gradient(circle at 40% 40%, rgba(120, 219, 255, 0.15) 0%, transparent 50%);
+            animation: backgroundShift 20s ease-in-out infinite;
+            z-index: -1;
+        }
+
+        @keyframes backgroundShift {
+            0%, 100% { transform: translateX(0) translateY(0) scale(1); }
+            33% { transform: translateX(-20px) translateY(-10px) scale(1.05); }
+            66% { transform: translateX(20px) translateY(10px) scale(0.95); }
         }
 
         .chat-container {
             display: flex;
             height: 100vh;
+            position: relative;
         }
 
         /* Sidebar */
         .sidebar {
-            width: 300px;
-            background: rgba(255, 255, 255, 0.1);
-            backdrop-filter: blur(15px);
-            border-right: 1px solid rgba(255, 255, 255, 0.2);
+            width: 320px;
+            background: var(--card-bg);
+            backdrop-filter: blur(20px);
+            border-right: 1px solid var(--border-color);
             display: flex;
             flex-direction: column;
-            transition: transform 0.3s ease;
+            transition: var(--transition);
+            box-shadow: var(--shadow-light);
         }
 
         .sidebar.hidden {
@@ -40,86 +82,170 @@
         }
 
         .sidebar-header {
-            padding: 1.5rem;
-            border-bottom: 1px solid rgba(255, 255, 255, 0.2);
-            color: white;
+            padding: 2rem 1.5rem;
+            border-bottom: 1px solid var(--border-color);
+            color: var(--text-primary);
+            background: rgba(255, 255, 255, 0.05);
         }
 
         .sidebar-header h3 {
-            margin-bottom: 0.5rem;
-            font-size: 1.2rem;
+            margin-bottom: 1rem;
+            font-size: 1.5rem;
+            font-weight: 700;
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+        }
+
+        .sidebar-header h3 i {
+            color: #4facfe;
+            font-size: 1.25rem;
         }
 
         .new-chat-btn {
             width: 100%;
-            padding: 0.8rem;
-            background: linear-gradient(45deg, #4facfe, #00f2fe);
+            padding: 1rem 1.5rem;
+            background: var(--accent-gradient);
             color: white;
             border: none;
-            border-radius: 10px;
+            border-radius: var(--border-radius);
             cursor: pointer;
             font-weight: 600;
-            transition: all 0.3s ease;
-            margin-bottom: 0.5rem;
+            font-size: 1rem;
+            transition: var(--transition);
+            margin-bottom: 1rem;
+            position: relative;
+            overflow: hidden;
+            box-shadow: 0 8px 32px rgba(79, 172, 254, 0.2);
+        }
+
+        .new-chat-btn::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+            transition: left 0.5s;
+        }
+
+        .new-chat-btn:hover::before {
+            left: 100%;
         }
 
         .new-chat-btn:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 5px 15px rgba(79, 172, 254, 0.3);
+            transform: translateY(-3px);
+            box-shadow: 0 12px 48px rgba(79, 172, 254, 0.3);
+        }
+
+        .new-chat-btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+
+        .new-chat-btn:disabled:hover {
+            transform: none;
+            box-shadow: none;
         }
 
         .clear-all-btn {
             width: 100%;
-            padding: 0.8rem;
+            padding: 1rem 1.5rem;
             background: linear-gradient(45deg, #ef4444, #f87171);
             color: white;
             border: none;
-            border-radius: 10px;
+            border-radius: var(--border-radius);
             cursor: pointer;
             font-weight: 600;
-            transition: all 0.3s ease;
+            font-size: 1rem;
+            transition: var(--transition);
+            position: relative;
+            overflow: hidden;
+            box-shadow: 0 8px 32px rgba(239, 68, 68, 0.2);
+        }
+
+        .clear-all-btn::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+            transition: left 0.5s;
+        }
+
+        .clear-all-btn:hover::before {
+            left: 100%;
         }
 
         .clear-all-btn:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 5px 15px rgba(239, 68, 68, 0.3);
+            transform: translateY(-3px);
+            box-shadow: 0 12px 48px rgba(239, 68, 68, 0.3);
         }
 
         .chat-history {
             flex: 1;
             overflow-y: auto;
-            padding: 1rem;
+            padding: 1.5rem 1rem;
+            scrollbar-width: thin;
+            scrollbar-color: rgba(255, 255, 255, 0.3) transparent;
+        }
+
+        .chat-history::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        .chat-history::-webkit-scrollbar-track {
+            background: transparent;
+        }
+
+        .chat-history::-webkit-scrollbar-thumb {
+            background: rgba(255, 255, 255, 0.3);
+            border-radius: 3px;
+        }
+
+        .chat-history::-webkit-scrollbar-thumb:hover {
+            background: rgba(255, 255, 255, 0.5);
         }
 
         .chat-item {
-            padding: 1rem;
-            margin-bottom: 0.5rem;
-            background: rgba(255, 255, 255, 0.1);
-            border-radius: 10px;
-            color: white;
+            padding: 1.25rem;
+            margin-bottom: 0.75rem;
+            background: var(--card-bg);
+            border-radius: var(--border-radius);
+            color: var(--text-primary);
             cursor: pointer;
-            transition: all 0.3s ease;
-            border-left: 3px solid transparent;
+            transition: var(--transition);
+            border: 1px solid var(--border-color);
             position: relative;
             display: flex;
             flex-direction: column;
+            backdrop-filter: blur(10px);
+            box-shadow: var(--shadow-light);
         }
 
         .chat-item:hover {
-            background: rgba(255, 255, 255, 0.2);
-            border-left-color: #4facfe;
+            background: var(--card-hover-bg);
+            transform: translateY(-2px);
+            box-shadow: var(--shadow-medium);
+            border-color: rgba(79, 172, 254, 0.3);
         }
 
         .chat-item.active {
-            background: rgba(79, 172, 254, 0.3);
-            border-left-color: #4facfe;
+            background: rgba(79, 172, 254, 0.15);
+            border-color: #4facfe;
+            box-shadow: 0 0 0 1px rgba(79, 172, 254, 0.3);
         }
 
         .chat-item-header {
             display: flex;
             justify-content: space-between;
             align-items: flex-start;
-            margin-bottom: 0.3rem;
+            margin-bottom: 0.75rem;
         }
 
         .delete-chat-btn {
@@ -127,16 +253,17 @@
             border: none;
             color: white;
             border-radius: 50%;
-            width: 24px;
-            height: 24px;
+            width: 28px;
+            height: 28px;
             cursor: pointer;
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: 0.8rem;
-            transition: all 0.3s ease;
+            font-size: 0.9rem;
+            transition: var(--transition);
             opacity: 0;
             transform: scale(0.8);
+            box-shadow: 0 4px 12px rgba(239, 68, 68, 0.3);
         }
 
         .chat-item:hover .delete-chat-btn {
@@ -147,27 +274,33 @@
         .delete-chat-btn:hover {
             background: rgba(239, 68, 68, 1);
             transform: scale(1.1);
+            box-shadow: 0 6px 16px rgba(239, 68, 68, 0.4);
         }
 
         .chat-item-title {
             font-weight: 600;
-            margin-bottom: 0.3rem;
-            font-size: 0.9rem;
+            margin-bottom: 0.5rem;
+            font-size: 1rem;
             word-break: break-word;
+            color: var(--text-primary);
+            line-height: 1.4;
         }
 
         .chat-item-preview {
-            font-size: 0.8rem;
-            opacity: 0.7;
+            font-size: 0.875rem;
+            opacity: 0.8;
             white-space: nowrap;
             overflow: hidden;
             text-overflow: ellipsis;
+            color: var(--text-secondary);
+            line-height: 1.4;
         }
 
         .chat-item-date {
-            font-size: 0.7rem;
-            opacity: 0.5;
-            margin-top: 0.3rem;
+            font-size: 0.75rem;
+            opacity: 0.6;
+            margin-top: 0.5rem;
+            color: var(--text-muted);
         }
 
         /* Main Chat Area */
@@ -175,32 +308,60 @@
             flex: 1;
             display: flex;
             flex-direction: column;
+            position: relative;
         }
 
         .chat-header {
-            background: rgba(255, 255, 255, 0.1);
-            backdrop-filter: blur(15px);
-            padding: 1rem 2rem;
-            border-bottom: 1px solid rgba(255, 255, 255, 0.2);
-            color: white;
+            background: var(--card-bg);
+            backdrop-filter: blur(20px);
+            padding: 1.5rem 2rem;
+            border-bottom: 1px solid var(--border-color);
+            color: var(--text-primary);
             display: flex;
             align-items: center;
             justify-content: space-between;
+            box-shadow: var(--shadow-light);
+        }
+
+        .chat-header h2 {
+            font-size: 1.5rem;
+            font-weight: 700;
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+        }
+
+        .chat-header h2 i {
+            color: #4facfe;
+            font-size: 1.25rem;
         }
 
         .toggle-sidebar {
-            background: none;
-            border: none;
-            color: white;
-            font-size: 1.2rem;
+            background: var(--card-bg);
+            border: 1px solid var(--border-color);
+            color: var(--text-primary);
+            font-size: 1.25rem;
             cursor: pointer;
-            padding: 0.5rem;
-            border-radius: 5px;
-            transition: background 0.3s ease;
+            padding: 0.75rem;
+            border-radius: var(--border-radius);
+            transition: var(--transition);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 48px;
+            height: 48px;
         }
 
         .toggle-sidebar:hover {
-            background: rgba(255, 255, 255, 0.2);
+            background: var(--card-hover-bg);
+            transform: translateY(-2px);
+            box-shadow: var(--shadow-light);
+        }
+
+        .header-btn:hover {
+            background: var(--card-hover-bg) !important;
+            transform: translateY(-2px);
+            box-shadow: var(--shadow-light);
         }
 
         .chat-messages {
@@ -209,20 +370,45 @@
             padding: 2rem;
             display: flex;
             flex-direction: column;
-            gap: 1rem;
+            gap: 1.5rem;
+            scrollbar-width: thin;
+            scrollbar-color: rgba(255, 255, 255, 0.3) transparent;
+        }
+
+        .chat-messages::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        .chat-messages::-webkit-scrollbar-track {
+            background: transparent;
+        }
+
+        .chat-messages::-webkit-scrollbar-thumb {
+            background: rgba(255, 255, 255, 0.3);
+            border-radius: 3px;
+        }
+
+        .chat-messages::-webkit-scrollbar-thumb:hover {
+            background: rgba(255, 255, 255, 0.5);
         }
 
         .message {
             display: flex;
             align-items: flex-start;
             gap: 1rem;
-            max-width: 80%;
-            animation: fadeIn 0.3s ease;
+            max-width: 85%;
+            animation: fadeInUp 0.5s ease-out;
         }
 
-        @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(10px); }
-            to { opacity: 1; transform: translateY(0); }
+        @keyframes fadeInUp {
+            from { 
+                opacity: 0; 
+                transform: translateY(20px) scale(0.95); 
+            }
+            to { 
+                opacity: 1; 
+                transform: translateY(0) scale(1); 
+            }
         }
 
         .message.user {
@@ -231,50 +417,57 @@
         }
 
         .message-avatar {
-            width: 40px;
-            height: 40px;
+            width: 44px;
+            height: 44px;
             border-radius: 50%;
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: 1.1rem;
+            font-size: 1.2rem;
             font-weight: bold;
             color: white;
             flex-shrink: 0;
+            box-shadow: var(--shadow-light);
+            border: 2px solid rgba(255, 255, 255, 0.2);
         }
 
         .message.user .message-avatar {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: var(--primary-gradient);
         }
 
         .message.bot .message-avatar {
-            background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+            background: var(--accent-gradient);
         }
 
         .message-content {
             background: white;
-            padding: 1rem 1.5rem;
-            border-radius: 18px;
-            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+            padding: 1.25rem 1.75rem;
+            border-radius: var(--border-radius);
+            box-shadow: var(--shadow-light);
             word-wrap: break-word;
-            line-height: 1.6;
+            line-height: 1.7;
             overflow-x: auto;
+            position: relative;
+            border: 1px solid rgba(255, 255, 255, 0.2);
         }
 
         .message.user .message-content {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: var(--primary-gradient);
             color: white;
+            box-shadow: 0 8px 32px rgba(102, 126, 234, 0.2);
         }
 
         .message.bot .message-content {
             background: white;
             color: #374151;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.08);
         }
 
         .message-time {
             font-size: 0.75rem;
-            opacity: 0.6;
-            margin-top: 0.5rem;
+            opacity: 0.7;
+            margin-top: 0.75rem;
+            font-weight: 500;
         }
 
         .typing-indicator {
@@ -314,119 +507,92 @@
 
         .chat-input-container {
             padding: 2rem;
-            background: rgba(255, 255, 255, 0.1);
-            backdrop-filter: blur(15px);
-            border-top: 1px solid rgba(255, 255, 255, 0.2);
+            background: var(--card-bg);
+            backdrop-filter: blur(20px);
+            border-top: 1px solid var(--border-color);
+            box-shadow: 0 -8px 32px rgba(0, 0, 0, 0.1);
         }
 
         .quick-prompts {
             display: flex;
-            gap: 0.5rem;
-            margin-bottom: 1rem;
+            gap: 0.75rem;
+            margin-bottom: 1.5rem;
             flex-wrap: wrap;
         }
 
         .quick-prompt {
-            padding: 0.5rem 1rem;
-            background: rgba(255, 255, 255, 0.2);
-            color: white;
-            border: 1px solid rgba(255, 255, 255, 0.3);
-            border-radius: 20px;
+            padding: 0.75rem 1.25rem;
+            background: var(--card-bg);
+            color: var(--text-primary);
+            border: 1px solid var(--border-color);
+            border-radius: var(--border-radius);
             cursor: pointer;
-            font-size: 0.85rem;
-            transition: all 0.3s ease;
+            font-size: 0.9rem;
+            font-weight: 500;
+            transition: var(--transition);
             white-space: nowrap;
-        }
-
-        .quick-prompt:hover {
-            background: rgba(255, 255, 255, 0.3);
-            transform: translateY(-2px);
-        }
-
-        .settings-prompt {
-            background: rgba(79, 172, 254, 0.3) !important;
-        }
-
-        .settings-prompt:hover {
-            background: rgba(79, 172, 254, 0.5) !important;
-        }
-
-        /* Doctor Settings */
-        .doctor-settings {
-            background: rgba(255, 255, 255, 0.15);
             backdrop-filter: blur(10px);
-            border-radius: 15px;
-            padding: 1rem;
-            margin: 1rem 0;
-            border: 1px solid rgba(255, 255, 255, 0.2);
-            animation: slideDown 0.3s ease;
-        }
-
-        .settings-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 1rem;
-            color: white;
-        }
-
-        .settings-header h4 {
-            font-size: 1rem;
-            margin: 0;
-        }
-
-        .close-settings {
-            background: none;
-            border: none;
-            color: white;
-            cursor: pointer;
-            padding: 0.25rem;
-            border-radius: 50%;
-            width: 30px;
-            height: 30px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            transition: all 0.3s ease;
-        }
-
-        .close-settings:hover {
-            background: rgba(255, 255, 255, 0.2);
-        }
-
-        .location-section {
-            margin-bottom: 1rem;
-        }
-
-        .location-status {
+            box-shadow: var(--shadow-light);
             display: flex;
             align-items: center;
             gap: 0.5rem;
-            color: white;
-            font-size: 0.9rem;
         }
 
-        .location-btn {
+        .quick-prompt:hover {
+            background: var(--card-hover-bg);
+            transform: translateY(-2px);
+            box-shadow: var(--shadow-medium);
+            border-color: rgba(79, 172, 254, 0.3);
+        }
+
+
+        .location-prompt {
+            background: #f8f9fa;
+            border: 2px solid #4facfe;
+            border-radius: 10px;
+            padding: 1rem;
+            margin: 1rem 0;
+            text-align: center;
+        }
+
+        .location-prompt h3 {
+            color: #4facfe;
+            margin: 0 0 0.5rem 0;
+        }
+
+        .location-prompt p {
+            color: #666;
+            margin: 0 0 1rem 0;
+        }
+
+        .location-prompt-buttons {
+            display: flex;
+            gap: 1rem;
+            justify-content: center;
+        }
+
+        .location-prompt-btn {
             background: #4facfe;
             color: white;
             border: none;
-            padding: 0.5rem 1rem;
-            border-radius: 20px;
+            padding: 0.75rem 1.5rem;
+            border-radius: 25px;
             cursor: pointer;
-            font-size: 0.8rem;
+            font-size: 0.9rem;
             transition: all 0.3s ease;
-            margin-left: auto;
         }
 
-        .location-btn:hover {
+        .location-prompt-btn:hover {
             background: #0084ff;
             transform: translateY(-1px);
         }
 
-        .location-btn:disabled {
+        .location-prompt-btn.secondary {
             background: #6c757d;
-            cursor: not-allowed;
-            transform: none;
+        }
+
+        .location-prompt-btn.secondary:hover {
+            background: #5a6268;
         }
 
         .sort-section {
@@ -478,43 +644,62 @@
 
         .chat-input {
             flex: 1;
-            padding: 1rem 1.5rem;
-            border: 2px solid rgba(255, 255, 255, 0.3);
-            border-radius: 25px;
+            padding: 1.25rem 1.75rem;
+            border: 2px solid var(--border-color);
+            border-radius: var(--border-radius-lg);
             font-size: 1rem;
             outline: none;
-            transition: all 0.3s ease;
+            transition: var(--transition);
             resize: none;
             max-height: 120px;
-            min-height: 50px;
+            min-height: 56px;
             font-family: inherit;
-            background: rgba(255, 255, 255, 0.9);
+            background: rgba(255, 255, 255, 0.95);
+            box-shadow: var(--shadow-light);
         }
 
         .chat-input:focus {
             border-color: #4facfe;
-            box-shadow: 0 0 0 3px rgba(79, 172, 254, 0.2);
+            box-shadow: 0 0 0 3px rgba(79, 172, 254, 0.2), var(--shadow-medium);
             background: white;
         }
 
         .send-button {
-            width: 50px;
-            height: 50px;
+            width: 56px;
+            height: 56px;
             border: none;
             border-radius: 50%;
-            background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+            background: var(--accent-gradient);
             color: white;
             cursor: pointer;
             display: flex;
             align-items: center;
             justify-content: center;
-            transition: all 0.3s ease;
-            font-size: 1.2rem;
+            transition: var(--transition);
+            font-size: 1.25rem;
+            box-shadow: var(--shadow-light);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .send-button::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+            transition: left 0.5s;
+        }
+
+        .send-button:hover::before {
+            left: 100%;
         }
 
         .send-button:hover:not(:disabled) {
             transform: scale(1.05);
-            box-shadow: 0 5px 15px rgba(79, 172, 254, 0.4);
+            box-shadow: 0 8px 32px rgba(79, 172, 254, 0.4);
         }
 
         .send-button:disabled {
@@ -524,8 +709,8 @@
         }
 
         .mic-button {
-            width: 50px;
-            height: 50px;
+            width: 56px;
+            height: 56px;
             border: none;
             border-radius: 50%;
             background: linear-gradient(135deg, #f59e0b 0%, #f97316 100%);
@@ -534,14 +719,32 @@
             display: flex;
             align-items: center;
             justify-content: center;
-            transition: all 0.3s ease;
-            font-size: 1.2rem;
+            transition: var(--transition);
+            font-size: 1.25rem;
             margin-right: 0.5rem;
+            box-shadow: var(--shadow-light);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .mic-button::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+            transition: left 0.5s;
+        }
+
+        .mic-button:hover::before {
+            left: 100%;
         }
 
         .mic-button:hover:not(:disabled) {
             transform: scale(1.05);
-            box-shadow: 0 5px 15px rgba(245, 158, 11, 0.4);
+            box-shadow: 0 8px 32px rgba(245, 158, 11, 0.4);
         }
 
         .mic-button.recording {
@@ -586,19 +789,29 @@
 
         .welcome-message {
             text-align: center;
-            color: white;
-            padding: 2rem;
-            opacity: 0.8;
+            color: var(--text-primary);
+            padding: 4rem 2rem;
+            opacity: 0.9;
+            max-width: 600px;
+            margin: 0 auto;
+            animation: fadeInUp 1s ease-out;
         }
 
         .welcome-message h2 {
-            margin-bottom: 1rem;
-            font-size: 2rem;
+            margin-bottom: 1.5rem;
+            font-size: 2.5rem;
+            font-weight: 800;
+            background: linear-gradient(135deg, #ffffff 0%, #4facfe 50%, #00f2fe 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
         }
 
         .welcome-message p {
-            font-size: 1.1rem;
-            line-height: 1.6;
+            font-size: 1.25rem;
+            line-height: 1.8;
+            color: var(--text-secondary);
+            font-weight: 400;
         }
 
 
@@ -936,7 +1149,7 @@
         <div class="sidebar" id="sidebar">
             <div class="sidebar-header">
                 <h3><i class="fas fa-history"></i> Chat History</h3>
-                <button class="new-chat-btn" onclick="startNewChat()">
+                <button class="new-chat-btn" id="newChatBtn" onclick="startNewChat()">
                     <i class="fas fa-plus"></i> New Chat
                 </button>
                 <button class="clear-all-btn" onclick="clearAllChats()">
@@ -958,20 +1171,20 @@
                     </button>
                     <div>
                         <h2><i class="fas fa-robot"></i> Medical Assistant</h2>
-                        <small>Ask me about your health concerns</small>
+                        <small style="color: var(--text-secondary); font-size: 0.9rem;">Ask me about your health concerns</small>
                     </div>
                 </div>
-                <div style="display: flex; gap: 1rem; flex-wrap: wrap;">
-                    <a href="/dashboard" style="color: white; text-decoration: none; padding: 0.5rem 1rem; border-radius: 10px; background: rgba(255,255,255,0.2); transition: all 0.3s ease;">
+                <div style="display: flex; gap: 0.75rem; flex-wrap: wrap;">
+                    <a href="/dashboard" class="header-btn" style="color: var(--text-primary); text-decoration: none; padding: 0.75rem 1.25rem; border-radius: var(--border-radius); background: var(--card-bg); border: 1px solid var(--border-color); transition: var(--transition); display: flex; align-items: center; gap: 0.5rem; font-weight: 500;">
                         <i class="fas fa-home"></i> Dashboard
                     </a>
-                    <button onclick="showEHRModal()" style="color: white; background: rgba(40, 167, 69, 0.3); border: none; padding: 0.5rem 1rem; border-radius: 10px; cursor: pointer; transition: all 0.3s ease;">
+                    <button onclick="showEHRModal()" class="header-btn" style="color: var(--text-primary); background: rgba(40, 167, 69, 0.2); border: 1px solid rgba(40, 167, 69, 0.3); padding: 0.75rem 1.25rem; border-radius: var(--border-radius); cursor: pointer; transition: var(--transition); display: flex; align-items: center; gap: 0.5rem; font-weight: 500;">
                         <i class="fas fa-notes-medical"></i> Health History
                     </button>
-                    <a href="/skin-analyzer" style="color: white; text-decoration: none; padding: 0.5rem 1rem; border-radius: 10px; background: rgba(79, 172, 254, 0.3); transition: all 0.3s ease;">
+                    <a href="/skin-analyzer" class="header-btn" style="color: var(--text-primary); text-decoration: none; padding: 0.75rem 1.25rem; border-radius: var(--border-radius); background: rgba(79, 172, 254, 0.2); border: 1px solid rgba(79, 172, 254, 0.3); transition: var(--transition); display: flex; align-items: center; gap: 0.5rem; font-weight: 500;">
                         <i class="fas fa-camera-retro"></i> Skin Analyzer
                     </a>
-                    <a href="/logout" style="color: white; text-decoration: none; padding: 0.5rem 1rem; border-radius: 10px; background: rgba(255,255,255,0.2); transition: all 0.3s ease;">
+                    <a href="/logout" class="header-btn" style="color: var(--text-primary); text-decoration: none; padding: 0.75rem 1.25rem; border-radius: var(--border-radius); background: var(--card-bg); border: 1px solid var(--border-color); transition: var(--transition); display: flex; align-items: center; gap: 0.5rem; font-weight: 500;">
                         <i class="fas fa-sign-out-alt"></i> Logout
                     </a>
                 </div>
@@ -979,7 +1192,7 @@
             
             <div class="chat-messages" id="chatMessages">
                 <div class="welcome-message">
-                    <h2>🏥 Welcome to MediGuide AI</h2>
+                    <h2>🏥 Welcome to MedBot AI</h2>
                     <p>I'm here to help you with medical questions and health concerns. Describe your symptoms and I'll guide you to the right specialist.</p>
                 </div>
             </div>
@@ -990,7 +1203,7 @@
                     <i class="fas fa-robot"></i>
                 </div>
                 <div class="message-content">
-                    <span>MediGuide is typing</span>
+                    <span>MedBot is typing</span>
                     <div class="typing-dots">
                         <div class="typing-dot"></div>
                         <div class="typing-dot"></div>
@@ -1017,40 +1230,8 @@
                     <div class="quick-prompt" onclick="sendQuickPrompt('I have back pain')">
                         <i class="fas fa-user-injured"></i> Back pain
                     </div>
-                    <div class="quick-prompt settings-prompt" onclick="showDoctorSettings()">
-                        <i class="fas fa-cog"></i> Doctor Settings
-                    </div>
                 </div>
                 
-                <!-- Doctor Recommendation Settings -->
-                <div class="doctor-settings" id="doctorSettings" style="display: none;">
-                    <div class="settings-header">
-                        <h4><i class="fas fa-user-md"></i> Doctor Recommendation Settings</h4>
-                        <button class="close-settings" onclick="hideDoctorSettings()">
-                            <i class="fas fa-times"></i>
-                        </button>
-                    </div>
-                    <div class="settings-content">
-                        <div class="location-section">
-                            <div class="location-status" id="locationStatus">
-                                <i class="fas fa-map-marker-alt"></i>
-                                <span id="locationText">Location not detected</span>
-                                <button class="location-btn" id="locationBtn" onclick="requestLocation()">
-                                    <i class="fas fa-crosshairs"></i> Get Location
-                                </button>
-                            </div>
-                        </div>
-                        
-                        <div class="sort-section">
-                            <label for="sortPreference">Sort doctors by:</label>
-                            <select id="sortPreference" class="sort-dropdown" onchange="handleSortChange()">
-                                <option value="rating">Highest Rating</option>
-                                <option value="experience">Most Experience</option>
-                                <option value="location">Nearest Location</option>
-                            </select>
-                        </div>
-                    </div>
-                </div>
                 
                 <div class="input-wrapper">
                     <textarea 
@@ -1130,107 +1311,10 @@
             return new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
         }
 
-        // Doctor Settings Functions
-        function showDoctorSettings() {
-            const settingsDiv = document.getElementById('doctorSettings');
-            settingsDiv.style.display = 'block';
-            updateLocationDisplay();
-            updateSortPreference();
-        }
 
-        function hideDoctorSettings() {
-            const settingsDiv = document.getElementById('doctorSettings');
-            settingsDiv.style.display = 'none';
-        }
 
-        function updateLocationDisplay() {
-            const locationText = document.getElementById('locationText');
-            const locationBtn = document.getElementById('locationBtn');
-            
-            if (window.ChatState.userLocation) {
-                locationText.textContent = `Location detected (${window.ChatState.userLocation.latitude.toFixed(4)}, ${window.ChatState.userLocation.longitude.toFixed(4)})`;
-                locationBtn.innerHTML = '<i class="fas fa-check"></i> Location Set';
-                locationBtn.disabled = false;
-                locationBtn.style.background = '#28a745';
-            } else {
-                locationText.textContent = 'Location not detected';
-                locationBtn.innerHTML = '<i class="fas fa-crosshairs"></i> Get Location';
-                locationBtn.disabled = false;
-                locationBtn.style.background = '#4facfe';
-            }
-        }
-
-        function updateSortPreference() {
-            const sortDropdown = document.getElementById('sortPreference');
-            sortDropdown.value = window.ChatState.doctorSortPreference;
-        }
-
-        function requestLocation() {
-            const locationBtn = document.getElementById('locationBtn');
-            const locationText = document.getElementById('locationText');
-            
-            if (!navigator.geolocation) {
-                alert('Geolocation is not supported by this browser.');
-                return;
-            }
-
-            locationBtn.disabled = true;
-            locationBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Getting Location...';
-            locationText.textContent = 'Requesting location permission...';
-
-            navigator.geolocation.getCurrentPosition(
-                function(position) {
-                    window.ChatState.userLocation = {
-                        latitude: position.coords.latitude,
-                        longitude: position.coords.longitude,
-                        accuracy: position.coords.accuracy
-                    };
-                    updateLocationDisplay();
-                    showStatus('Location detected successfully!', 'success');
-                    console.log('📍 User location:', window.ChatState.userLocation);
-                },
-                function(error) {
-                    let errorMessage = 'Location access denied or failed.';
-                    switch(error.code) {
-                        case error.PERMISSION_DENIED:
-                            errorMessage = 'Location access denied by user.';
-                            break;
-                        case error.POSITION_UNAVAILABLE:
-                            errorMessage = 'Location information is unavailable.';
-                            break;
-                        case error.TIMEOUT:
-                            errorMessage = 'Location request timed out.';
-                            break;
-                    }
-                    locationText.textContent = errorMessage;
-                    locationBtn.disabled = false;
-                    locationBtn.innerHTML = '<i class="fas fa-crosshairs"></i> Try Again';
-                    showStatus(errorMessage, 'error');
-                    console.log('❌ Location error:', error);
-                },
-                {
-                    enableHighAccuracy: true,
-                    timeout: 10000,
-                    maximumAge: 300000 // 5 minutes
-                }
-            );
-        }
-
-        // Handle sort preference change
-        function handleSortChange() {
-            const sortDropdown = document.getElementById('sortPreference');
-            window.ChatState.doctorSortPreference = sortDropdown.value;
-            const sortText = sortDropdown.options[sortDropdown.selectedIndex].text;
-            
-            showStatus(`Sort preference updated: ${sortText}`, 'success');
-            console.log('🔄 Sort preference changed to:', window.ChatState.doctorSortPreference);
-            
-            // If there's a recent doctor recommendation, refresh it with new sorting
-            refreshLastDoctorRecommendation();
-        }
-
-        // Function to refresh the last doctor recommendation with new sorting
-        function refreshLastDoctorRecommendation() {
+        // Function to dynamically update the last doctor recommendation with new sorting
+        function updateLastDoctorRecommendation() {
             // Find the last bot message that contains a doctor table
             const botMessages = document.querySelectorAll('.message.bot');
             for (let i = botMessages.length - 1; i >= 0; i--) {
@@ -1252,7 +1336,7 @@
                     else if (content.includes('psychiatrist')) specialty = 'psychiatrist';
                     
                     if (specialty) {
-                        console.log(`🔄 Refreshing ${specialty} recommendations with ${window.ChatState.doctorSortPreference} sorting`);
+                        console.log(`🔄 Dynamically updating ${specialty} recommendations with ${window.ChatState.doctorSortPreference} sorting`);
                         requestUpdatedDoctorRecommendations(specialty, messageContent);
                         return;
                     }
@@ -1267,17 +1351,17 @@
                 showStatus('Updating recommendations...', 'info');
                 
                 const requestBody = {
-                    message: `Show me ${specialty} recommendations sorted by ${window.ChatState.doctorSortPreference}`,
-                    chatId: window.ChatState.currentChatId,
-                    sortPreference: window.ChatState.doctorSortPreference
+                    specialty: specialty,
+                    sort_by: window.ChatState.doctorSortPreference,
+                    city: 'Bangalore'
                 };
                 
                 // Include location if available
-                if (window.ChatState.userLocation) {
+            if (window.ChatState.userLocation) {
                     requestBody.userLocation = window.ChatState.userLocation;
                 }
                 
-                const response = await fetch('/api/chat', {
+                const response = await fetch('/api/doctors/sort', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
@@ -1292,7 +1376,7 @@
                 const data = await response.json();
                 
                 // Update the message content with new sorted recommendations
-                if (data.response) {
+                if (data.success && data.response) {
                     messageElement.innerHTML = data.response;
                     
                     // Re-add email button if it was there
@@ -1302,6 +1386,8 @@
                     }
                     
                     showStatus('Recommendations updated successfully!', 'success');
+            } else {
+                    throw new Error(data.error || 'No response received');
                 }
                 
             } catch (error) {
@@ -1313,6 +1399,242 @@
         // Helper function to detect if content contains doctor recommendations
         function hasDoctorRecommendations(content) {
             return content.includes('Important Notes:') && content.includes('<table');
+        }
+
+        // Location prompt functions - NEW APPROACH: Ask location FIRST
+        function showLocationPromptFirst() {
+            // Check if location prompt already exists
+            if (document.getElementById('locationPrompt')) {
+                return;
+            }
+
+            const locationPrompt = document.createElement('div');
+            locationPrompt.id = 'locationPrompt';
+            locationPrompt.className = 'location-prompt';
+            locationPrompt.innerHTML = `
+                <h3><i class="fas fa-map-marker-alt"></i> Find Nearby Doctors?</h3>
+                <p>Would you like to see doctors sorted by distance from your location?</p>
+                <div class="location-prompt-buttons">
+                    <button class="location-prompt-btn" onclick="requestLocationAndShowDoctors()">
+                        <i class="fas fa-crosshairs"></i> Yes, Use My Location
+                    </button>
+                    <button class="location-prompt-btn secondary" onclick="showDoctorsWithoutLocation()">
+                        <i class="fas fa-times"></i> No, Show All Doctors
+                    </button>
+                </div>
+            `;
+
+            // Add to the last bot message
+            const botMessages = document.querySelectorAll('.message.bot');
+            if (botMessages.length > 0) {
+                const lastBotMessage = botMessages[botMessages.length - 1];
+                const messageContent = lastBotMessage.querySelector('.message-content');
+                if (messageContent) {
+                    messageContent.appendChild(locationPrompt);
+                }
+            }
+        }
+
+        function hideLocationPrompt() {
+            const locationPrompt = document.getElementById('locationPrompt');
+            if (locationPrompt) {
+                locationPrompt.remove();
+            }
+        }
+
+        function requestLocationAndShowDoctors() {
+            if (!navigator.geolocation) {
+                alert('Geolocation is not supported by this browser.');
+                showDoctorsWithoutLocation();
+                return;
+            }
+
+            const locationBtn = document.querySelector('#locationPrompt .location-prompt-btn');
+            const originalText = locationBtn.innerHTML;
+
+            locationBtn.disabled = true;
+            locationBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Getting Location...';
+
+            navigator.geolocation.getCurrentPosition(
+                function(position) {
+                    window.ChatState.userLocation = {
+                        latitude: position.coords.latitude,
+                        longitude: position.coords.longitude,
+                        accuracy: position.coords.accuracy
+                    };
+                    
+                    console.log('📍 User location:', window.ChatState.userLocation);
+                    showStatus('Location detected! Loading nearby doctors...', 'success');
+                    
+                    // Show doctors with location-based sorting
+                    showDoctorsWithLocation();
+                    hideLocationPrompt();
+                },
+                function(error) {
+                    let errorMessage = 'Location access denied or failed.';
+                    switch(error.code) {
+                        case error.PERMISSION_DENIED:
+                            errorMessage = 'Location access denied by user.';
+                            break;
+                        case error.POSITION_UNAVAILABLE:
+                            errorMessage = 'Location information is unavailable.';
+                            break;
+                        case error.TIMEOUT:
+                            errorMessage = 'Location request timed out.';
+                            break;
+                    }
+                    
+                    locationBtn.disabled = false;
+                    locationBtn.innerHTML = originalText;
+                    showStatus(errorMessage, 'error');
+                    console.log('❌ Location error:', error);
+                    
+                    // Fallback to showing doctors without location
+                    showDoctorsWithoutLocation();
+                },
+                {
+                    enableHighAccuracy: true,
+                    timeout: 10000,
+                    maximumAge: 300000 // 5 minutes
+                }
+            );
+        }
+
+        function showDoctorsWithoutLocation() {
+            console.log('📋 Showing doctors without location');
+            hideLocationPrompt();
+            
+            // Get the specialty from the current bot message
+            const specialty = extractSpecialtyFromCurrentMessage();
+            if (specialty) {
+                // Set sort preference to rating (default)
+                window.ChatState.doctorSortPreference = 'rating';
+                showDoctorsWithFilters(specialty, 'rating');
+            }
+        }
+
+        function showDoctorsWithLocation() {
+            console.log('📍 Showing doctors with location');
+            
+            // Get the specialty from the current bot message
+            const specialty = extractSpecialtyFromCurrentMessage();
+                    if (specialty) {
+                // Set sort preference to location
+                window.ChatState.doctorSortPreference = 'location';
+                showDoctorsWithFilters(specialty, 'location');
+            }
+        }
+
+        function extractSpecialtyFromCurrentMessage() {
+            const botMessages = document.querySelectorAll('.message.bot');
+            if (botMessages.length > 0) {
+                const lastBotMessage = botMessages[botMessages.length - 1];
+                const messageContent = lastBotMessage.querySelector('.message-content');
+                if (messageContent) {
+                    const content = messageContent.innerHTML.toLowerCase();
+                    if (content.includes('neurologist')) return 'neurologist';
+                    else if (content.includes('cardiologist')) return 'cardiologist';
+                    else if (content.includes('orthopedist')) return 'orthopedist';
+                    else if (content.includes('dermatologist')) return 'dermatologist';
+                    else if (content.includes('gynecologist')) return 'gynecologist';
+                    else if (content.includes('pediatrician')) return 'pediatrician';
+                    else if (content.includes('general physician')) return 'general physician';
+                    else if (content.includes('dentist')) return 'dentist';
+                    else if (content.includes('ophthalmologist')) return 'ophthalmologist';
+                    else if (content.includes('psychiatrist')) return 'psychiatrist';
+                }
+            }
+            return 'general physician'; // fallback
+        }
+
+        async function showDoctorsWithFilters(specialty, sortBy) {
+            try {
+                showStatus('Loading doctor recommendations...', 'info');
+                
+                const requestBody = {
+                    specialty: specialty,
+                    sort_by: sortBy,
+                    city: 'Bangalore'
+                };
+                
+                // Include location if available
+                if (window.ChatState.userLocation) {
+                    requestBody.userLocation = window.ChatState.userLocation;
+                }
+                
+                const response = await fetch('/api/doctors/sort', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(requestBody)
+                });
+
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}`);
+                }
+
+                const data = await response.json();
+                
+                if (data.success && data.response) {
+                    // Replace the current bot message content with the new doctor recommendations
+                    const botMessages = document.querySelectorAll('.message.bot');
+                    if (botMessages.length > 0) {
+                        const lastBotMessage = botMessages[botMessages.length - 1];
+                        const messageContent = lastBotMessage.querySelector('.message-content');
+                        if (messageContent) {
+                            // Add filter controls on top
+                            const filterControls = createFilterControls(specialty, sortBy);
+                            messageContent.innerHTML = filterControls + data.response;
+                            
+                            // Add email button
+                    if (hasDoctorRecommendations(data.response)) {
+                        const emailButton = createEmailButton(data.response);
+                                messageContent.appendChild(emailButton);
+                            }
+                        }
+                    }
+                    
+                    showStatus('Doctor recommendations loaded!', 'success');
+                } else {
+                    throw new Error(data.error || 'No response received');
+                }
+                
+            } catch (error) {
+                console.error('❌ Error loading doctor recommendations:', error);
+                showStatus('Failed to load doctor recommendations', 'error');
+            }
+        }
+
+        function createFilterControls(specialty, currentSort) {
+            return `
+                <div class="doctor-filters" style="margin-bottom: 1rem; padding: 1rem; background: #f8f9fa; border-radius: 8px; border: 1px solid #dee2e6;">
+                    <div style="display: flex; align-items: center; gap: 1rem; flex-wrap: wrap;">
+                        <div style="display: flex; align-items: center; gap: 0.5rem;">
+                            <i class="fas fa-filter" style="color: #4facfe;"></i>
+                            <span style="font-weight: bold; color: #333;">Filter by:</span>
+                        </div>
+                        <select id="doctorSortFilter" class="sort-dropdown" onchange="updateDoctorFilter('${specialty}')" style="padding: 0.5rem; border: 1px solid #ccc; border-radius: 4px; background: white;">
+                            <option value="rating" ${currentSort === 'rating' ? 'selected' : ''}>Highest Rating</option>
+                            <option value="experience" ${currentSort === 'experience' ? 'selected' : ''}>Most Experience</option>
+                            <option value="location" ${currentSort === 'location' ? 'selected' : ''}>Nearest Location</option>
+                        </select>
+                        <div style="font-size: 0.9rem; color: #666;">
+                            <i class="fas fa-user-md"></i> ${specialty.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())}s
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
+        async function updateDoctorFilter(specialty) {
+            const sortDropdown = document.getElementById('doctorSortFilter');
+            const newSort = sortDropdown.value;
+            
+            console.log(`🔄 Updating filter: ${specialty} by ${newSort}`);
+            window.ChatState.doctorSortPreference = newSort;
+            
+            await showDoctorsWithFilters(specialty, newSort);
         }
 
         // Helper function to create email button
@@ -1584,8 +1906,7 @@
                 
                 const requestBody = { 
                     message: message,
-                    chatId: window.ChatState.currentChatId, // Include chat ID for context
-                    sortPreference: window.ChatState.doctorSortPreference
+                    chatId: window.ChatState.currentChatId // Include chat ID for context
                 };
                 
                 // Include location if available
@@ -1618,6 +1939,18 @@
                 console.log("🤖 Bot response:", botResponse);
                 addMessage(botResponse);
                 updateChatHistory();
+                
+                // Check if this response contains doctor recommendations and prompt for location FIRST
+                if (hasDoctorRecommendations(botResponse)) {
+                    showLocationPromptFirst();
+                }
+                
+                // If database is available, refresh the sidebar to show updated conversation
+                if (window.ChatState.isServerReady) {
+                    console.log("🔄 Refreshing sidebar from database...");
+                    loadDatabaseChatHistory();
+                }
+                
                 showStatus("Message sent successfully", "success");
                 
             } catch (error) {
@@ -1644,43 +1977,76 @@
             }
         }
 
-        // FIXED: Start new chat function
+        // IMPROVED: Start new chat function with better error handling
         async function startNewChat() {
             console.log("🔄 Starting new chat...");
             console.log("📊 Initial state:", JSON.stringify(window.ChatState));
             
             // Prevent if already resetting
             if (window.ChatState.resetInProgress) {
-                console.log("⏳ Reset already in progress");
+                console.log("⏳ Reset already in progress, ignoring duplicate request");
+                return;
+            }
+            
+            // Prevent if message is being sent
+            if (window.ChatState.sendInProgress) {
+                console.log("⏳ Message send in progress, waiting...");
+                showStatus("Please wait for current message to complete", "warning");
                 return;
             }
             
             showStatus("Starting new chat...", "info", 0);
             window.ChatState.resetInProgress = true;
             
+            // Disable button to prevent multiple clicks
+            const newChatBtn = document.getElementById('newChatBtn');
+            if (newChatBtn) {
+                newChatBtn.disabled = true;
+                newChatBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Starting...';
+            }
+            
             try {
-                // STEP 1: Reset server conversation state FIRST (optional - may not be needed)
-                try {
-                    console.log("🔄 Calling /api/reset endpoint...");
-                    const resetResponse = await fetch('/api/reset', {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json',
-                        },
-                        body: JSON.stringify({ action: 'reset_conversation' })
-                    });
+                // STEP 1: Reset server conversation state FIRST
+                console.log("🔄 Calling /api/reset endpoint...");
+                
+                // Add timeout to prevent hanging
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
+                
+                const resetResponse = await fetch('/api/reset', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ action: 'reset_conversation' }),
+                    signal: controller.signal
+                });
 
-                    if (resetResponse.ok) {
-                        const resetData = await resetResponse.json();
-                        console.log("✅ Server reset response:", resetData);
-                    } else {
-                        console.warn("⚠️ Server reset failed, continuing with local reset");
-                    }
-                } catch (resetError) {
-                    console.warn("⚠️ Server reset failed, continuing with local reset:", resetError);
+                clearTimeout(timeoutId);
+
+                if (!resetResponse.ok) {
+                    const errorText = await resetResponse.text();
+                    throw new Error(`Reset failed: ${resetResponse.status} - ${errorText}`);
+                }
+
+                const resetData = await resetResponse.json();
+                console.log("✅ Server reset response:", resetData);
+                
+                // Validate response
+                if (!resetData.success) {
+                    throw new Error(`Server reset failed: ${resetData.message || 'Unknown error'}`);
                 }
                 
-                // STEP 2: Clear frontend state completely
+                // Handle new session token if provided
+                if (resetData.new_session_token) {
+                    console.log("🔄 Received new session token, updating cookie");
+                    // The cookie is automatically set by the server response
+                }
+                
+                // STEP 2: Wait for server to fully reset
+                await new Promise(resolve => setTimeout(resolve, 500)); // Reduced wait time
+                
+                // STEP 3: Clear frontend state completely
                 window.ChatState = {
                     currentChatId: null,
                     messageCount: 0,
@@ -1690,33 +2056,45 @@
                     sendInProgress: false
                 };
                 
-                // STEP 4: Clear UI
-                const chatMessages = document.getElementById('chatMessages');
-                chatMessages.innerHTML = `
-                    <div class="welcome-message">
-                        <h2>🏥 Welcome to MediGuide AI</h2>
-                        <p>I'm here to help you with medical questions and health concerns. Describe your symptoms and I'll guide you to the right specialist.</p>
-                    </div>
-                `;
-                
-                // Clear active chat indicators
-                document.querySelectorAll('.chat-item').forEach(item => {
-                    item.classList.remove('active');
-                });
-                
-                // Reset input
-                const messageInput = document.getElementById('messageInput');
-                messageInput.value = '';
-                messageInput.style.height = 'auto';
-                messageInput.disabled = false;
-                
-                const sendButton = document.getElementById('sendButton');
-                sendButton.disabled = false;
-                
-                // Hide typing indicator if visible
-                hideTypingIndicator();
-                
-                messageInput.focus();
+                // STEP 4: Clear UI with error handling
+                try {
+                    const chatMessages = document.getElementById('chatMessages');
+                    if (chatMessages) {
+                        chatMessages.innerHTML = `
+                            <div class="welcome-message">
+                                <h2>🏥 Welcome to MedBot AI</h2>
+                                <p>I'm here to help you with medical questions and health concerns. Describe your symptoms and I'll guide you to the right specialist.</p>
+                            </div>
+                        `;
+                    }
+                    
+                    // Clear active chat indicators
+                    document.querySelectorAll('.chat-item').forEach(item => {
+                        item.classList.remove('active');
+                    });
+                    
+                    // Reset input with error handling
+                    const messageInput = document.getElementById('messageInput');
+                    if (messageInput) {
+                        messageInput.value = '';
+                        messageInput.style.height = 'auto';
+                        messageInput.disabled = false;
+                        messageInput.focus();
+                    }
+                    
+                    const sendButton = document.getElementById('sendButton');
+                    if (sendButton) {
+                        sendButton.disabled = false;
+                    }
+                    
+                    // Hide typing indicator if visible
+                    if (typeof hideTypingIndicator === 'function') {
+                        hideTypingIndicator();
+                    }
+                    
+                } catch (uiError) {
+                    console.warn("⚠️ UI update error (non-critical):", uiError);
+                }
                 
                 console.log("✅ New chat started successfully");
                 console.log("📊 Final state:", JSON.stringify(window.ChatState));
@@ -1724,14 +2102,43 @@
                 
             } catch (error) {
                 console.error("❌ Error starting new chat:", error);
-                showStatus("Error starting new chat - " + error.message, "error");
-            } finally {
+                
+                // Determine error type and show appropriate message
+                let errorMessage = "Error starting new chat";
+                if (error.name === 'AbortError') {
+                    errorMessage = "Request timed out. Please try again.";
+                } else if (error.message.includes('Failed to fetch')) {
+                    errorMessage = "Network error. Please check your connection.";
+                } else if (error.message.includes('Reset failed')) {
+                    errorMessage = "Server error. Please refresh the page.";
+                } else {
+                    errorMessage = `Error: ${error.message}`;
+                }
+                
+                showStatus(errorMessage, "error");
+                
+                // Reset the flag even on error to allow retry
                 window.ChatState.resetInProgress = false;
+                
+            } finally {
+                // Ensure resetInProgress is always cleared
+                window.ChatState.resetInProgress = false;
+                
+                // Re-enable button
+                const newChatBtn = document.getElementById('newChatBtn');
+                if (newChatBtn) {
+                    newChatBtn.disabled = false;
+                    newChatBtn.innerHTML = '<i class="fas fa-plus"></i> New Chat';
+                }
+                
+                console.log("🔄 Reset process completed");
             }
         }
 
         // Update chat history in sidebar
         function updateChatHistory() {
+            // Only save to localStorage if database is not available
+            if (!window.ChatState.isServerReady) {
             if (window.ChatState.chatHistory.length > 0) {
                 // Create a chat session title from the first user message
                 const firstUserMessage = window.ChatState.chatHistory.find(msg => msg.isUser);
@@ -1740,6 +2147,9 @@
                     'New Chat';
                 
                 saveChatSession(title);
+                }
+            } else {
+                console.log("📊 Database available, skipping localStorage chat saving");
             }
         }
 
@@ -1776,7 +2186,7 @@
             chatHistoryContainer.insertBefore(chatItem, chatHistoryContainer.firstChild);
             
             // Store in localStorage for persistence
-            const savedChats = JSON.parse(localStorage.getItem('mediguide_chats') || '[]');
+            const savedChats = JSON.parse(localStorage.getItem('medbot_chats') || '[]');
             savedChats.unshift({
                 id: window.ChatState.currentChatId,
                 title: title,
@@ -1789,7 +2199,7 @@
                 savedChats.splice(50);
             }
             
-            localStorage.setItem('mediguide_chats', JSON.stringify(savedChats));
+            localStorage.setItem('medbot_chats', JSON.stringify(savedChats));
             
             // Also save as fallback for database-style loading (for when DB is unavailable)
             const fallbackKey = `chat_fallback_db-session-${Date.now()}`;
@@ -1811,7 +2221,7 @@
             let chat = null;
             
             // Try to find chat in localStorage first
-            const savedChats = JSON.parse(localStorage.getItem('mediguide_chats') || '[]');
+            const savedChats = JSON.parse(localStorage.getItem('medbot_chats') || '[]');
             chat = savedChats.find(c => c.id === chatId);
             
             // If not found in localStorage, try to load from database API
@@ -1823,14 +2233,9 @@
                     // Remove 'db-session-' prefix if present for backward compatibility
                     const actualConversationId = chatId.startsWith('db-session-') ? chatId.substring(11) : chatId;
                     
-                    console.log("🔍 Loading conversation with ID:", actualConversationId);
                     const response = await fetch(`/api/conversation/${actualConversationId}/messages`);
-                    console.log("📡 Database API response status:", response.status);
-                    
                     if (response.ok) {
                         const data = await response.json();
-                        console.log("📨 Database API response data:", data);
-                        
                         if (data.success) {
                             // Convert database message format to frontend format
                             const convertedMessages = convertDatabaseMessagesToFrontendFormat(data.messages || []);
@@ -1844,11 +2249,7 @@
                             };
                             
                             console.log(`✅ Loaded conversation ${actualConversationId} with ${chat.messages.length} messages from database`);
-                        } else {
-                            console.warn("❌ Database API returned error:", data.error);
                         }
-                    } else {
-                        console.warn("❌ Database API request failed:", response.status, response.statusText);
                     }
                 } catch (error) {
                     console.warn("⚠️  Database unavailable, trying local fallback:", error);
@@ -1972,9 +2373,9 @@
             event.stopPropagation();
             
             // Remove from localStorage
-            const savedChats = JSON.parse(localStorage.getItem('mediguide_chats') || '[]');
+            const savedChats = JSON.parse(localStorage.getItem('medbot_chats') || '[]');
             const updatedChats = savedChats.filter(chat => chat.id !== chatId);
-            localStorage.setItem('mediguide_chats', JSON.stringify(updatedChats));
+            localStorage.setItem('medbot_chats', JSON.stringify(updatedChats));
             
             // Remove from DOM immediately using data attribute
             const chatItem = document.querySelector(`[data-chat-id="${chatId}"]`);
@@ -2018,7 +2419,7 @@
                 }
                 
                 // Clear localStorage
-                localStorage.removeItem('mediguide_chats');
+                localStorage.removeItem('medbot_chats');
                 
                 // Clear sidebar
                 const chatHistoryContainer = document.getElementById('chatHistory');
@@ -2132,7 +2533,7 @@
             return sessions.reverse(); // Show newest first
         }
         
-        // Convert conversations API format to chat sessions (FIXED)
+        // Convert conversations API format to chat sessions (legacy)
         function convertConversationsToChatSessions(conversations) {
             const sessions = [];
             
@@ -2140,11 +2541,10 @@
                 sessions.push({
                     id: conv.id,
                     title: conv.title,
-                    messages: [], // Will be loaded when clicked - this is correct
+                    messages: [], // Will be loaded when clicked
                     date: conv.updated_at || conv.created_at,
                     source: 'database',
-                    messageCount: conv.message_count,
-                    conversation_id: conv.id // Add this for proper API calls
+                    messageCount: conv.message_count
                 });
             }
             
@@ -2178,10 +2578,10 @@
                     });
                 }
                 
-                if (dbMsg.type === 'assistant' && (dbMsg.response || dbMsg.message)) {
+                if (dbMsg.type === 'assistant' && dbMsg.response) {
                     // Add assistant response (preserve HTML for doctor recommendations)
                     frontendMessages.push({
-                        content: dbMsg.response || dbMsg.message,
+                        content: dbMsg.response,
                         isUser: false,
                         timestamp: dbMsg.timestamp || new Date().toISOString()
                     });
@@ -2204,10 +2604,6 @@
             }
             
             console.log(`✅ Converted ${dbMessages.length} database messages to ${frontendMessages.length} frontend messages`);
-            console.log("🔍 Frontend messages preview:", frontendMessages.slice(0, 4).map(m => ({ 
-                isUser: m.isUser, 
-                content: m.content.substring(0, 50) + '...' 
-            })));
             return frontendMessages;
         }
         
@@ -2261,6 +2657,10 @@
         function displayChatSessions(chatSessions) {
             const chatHistoryContainer = document.getElementById('chatHistory');
             
+            // Clear existing chats first to prevent duplicates
+            chatHistoryContainer.innerHTML = '';
+            console.log(`🧹 Cleared sidebar, displaying ${chatSessions.length} chat sessions`);
+            
             chatSessions.forEach(chat => {
                 const chatItem = document.createElement('div');
                 chatItem.className = 'chat-item';
@@ -2288,8 +2688,12 @@
 
         // Load saved chats from localStorage (legacy support)
         function loadSavedChats() {
-            const savedChats = JSON.parse(localStorage.getItem('mediguide_chats') || '[]');
+            const savedChats = JSON.parse(localStorage.getItem('medbot_chats') || '[]');
             const chatHistoryContainer = document.getElementById('chatHistory');
+            
+            // Clear existing chats first to prevent duplicates
+            chatHistoryContainer.innerHTML = '';
+            console.log(`🧹 Cleared sidebar, loading ${savedChats.length} saved chats from localStorage`);
             
             savedChats.forEach(chat => {
                 const chatItem = document.createElement('div');
@@ -2331,14 +2735,6 @@
             return false;
         }
 
-        // Debug function for development
-        function debugState() {
-            console.log("- Global ChatState:", JSON.stringify(window.ChatState, null, 2));
-            console.log("- Input field:", document.getElementById('messageInput').value);
-            console.log("- Send button disabled:", document.getElementById('sendButton').disabled);
-            console.log("- Messages count:", document.querySelectorAll('.message').length);
-            console.log("- Welcome message visible:", !!document.querySelector('.welcome-message'));
-        }
 
         // Test API connection
         async function testAPI() {
@@ -2369,49 +2765,6 @@
             }
         }
 
-        // Enhanced: Check for specialist and message pre-loading from image analysis
-        function checkSpecialistPreload() {
-            try {
-                const urlParams = new URLSearchParams(window.location.search);
-                const specialist = urlParams.get('specialist');
-                const message = urlParams.get('message');
-                
-                if (specialist || message) {
-                    console.log('🏥 Medical image analysis redirect detected');
-                    console.log('   Specialist:', specialist);
-                    console.log('   Message:', message);
-                    
-                    if (specialist) {
-                        // Show notification about specialist context
-                        const specialistName = specialist.replace('-', ' ').replace(/\b\w/g, l => l.toUpperCase());
-                        addMessage(`🏥 **Medical Image Analysis Complete**\n\nBased on your medical image analysis, I recommend consulting a **${specialistName}**. I'm here to help you find qualified doctors and prepare for your consultation.`, 'ai');
-                    }
-                    
-                    // Auto-send the message if provided
-                    if (message) {
-                        setTimeout(() => {
-                            const messageInput = document.getElementById('messageInput');
-                            if (messageInput) {
-                                messageInput.value = message;
-                                // Auto-send the message
-                                setTimeout(() => {
-                                    sendMessage();
-                                }, 500);
-                            }
-                        }, 1000);
-                    }
-                    
-                    // Clean up URL parameters
-                    setTimeout(() => {
-                        const newUrl = window.location.pathname;
-                        window.history.replaceState({}, document.title, newUrl);
-                    }, 2000);
-                }
-            } catch (error) {
-                console.error('Error checking specialist preload:', error);
-            }
-        }
-
         // Initialize application
         document.addEventListener('DOMContentLoaded', async function() {
             console.log("🚀 Initializing chat application...");
@@ -2426,9 +2779,6 @@
                 sendInProgress: false
             };
             
-            // Check for specialist pre-loading from URL parameters
-            checkSpecialistPreload();
-            
             // Check API status first
             const apiStatus = await checkAPIStatus();
             window.ChatState.isServerReady = apiStatus;
@@ -2437,30 +2787,16 @@
             // Load chat history from database (primary source)
             if (apiStatus) {
                 await loadDatabaseChatHistory();
+                console.log("✅ Database conversations loaded, skipping localStorage");
             } else {
                 console.warn("⚠ API offline, loading from localStorage only");
+                // Only load from localStorage if database is not available
+                loadSavedChats();
             }
-            
-            // Load any remaining chats from localStorage (fallback/legacy)
-            loadSavedChats();
             
             // Focus on input
             document.getElementById('messageInput').focus();
             
-            // Add debug button for localhost
-            if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
-                const debugBtn = document.createElement('button');
-                debugBtn.className = 'debug-btn';
-                debugBtn.textContent = 'Debug';
-                debugBtn.onclick = () => {
-                    debugState();
-                    testAPI();
-                };
-                debugBtn.style.cssText = 'position: fixed; top: 10px; right: 10px; z-index: 9999; background: #4facfe; color: white; border: none; padding: 10px; border-radius: 5px; cursor: pointer;';
-                document.body.appendChild(debugBtn);
-                
-                console.log("🔧 Debug mode enabled (localhost)");
-            }
             
             // Add global error handler for debugging
             window.addEventListener('error', (event) => {

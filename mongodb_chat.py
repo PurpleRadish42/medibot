@@ -86,6 +86,9 @@ class MongoDBChatHistory:
             # Generate conversation_id if not provided
             if not conversation_id:
                 conversation_id = str(uuid.uuid4())
+                print(f"🆕 Generated new conversation ID: {conversation_id}")
+            else:
+                print(f"📝 Using provided conversation ID: {conversation_id}")
             
             # Get or create session
             session = self.get_or_create_session(user_id, conversation_id, message)
@@ -294,12 +297,18 @@ class MongoDBChatHistory:
             
             result = []
             for msg in messages:
-                result.append({
+                message_data = {
                     'type': msg['message_type'],
                     'message': msg['message'],
                     'timestamp': msg['timestamp'].isoformat() if msg['timestamp'] else None,
                     'message_order': msg['message_order']
-                })
+                }
+                
+                # Add response field for assistant messages
+                if msg['message_type'] == 'assistant' and 'response' in msg:
+                    message_data['response'] = msg['response']
+                
+                result.append(message_data)
             
             return result
             

@@ -1,6 +1,5 @@
 import sys
 import os
-from typing import Dict, Any, List
 from pathlib import Path
 from functools import wraps
 import threading
@@ -25,11 +24,11 @@ sys.path.insert(0, str(project_root))  # Add project root for doctor_recommender
 # Flask imports
 from flask import Flask, render_template, request, jsonify, redirect, url_for, session, make_response
 import gradio as gr
-from datetime import datetime
 
 # Import authentication database and MongoDB chat history
 from medibot2_auth import MedibotAuthDatabase
 from mongodb_chat import MongoDBChatHistory
+from otp_service import OTPService
 
 # Import your medical recommender directly with doctor integration
 medical_recommender = None
@@ -66,6 +65,7 @@ app.secret_key = os.getenv('SECRET_KEY', 'your-secret-key-change-this-in-product
 # Initialize authentication database (MySQL) and chat history (MongoDB)
 auth_db = MedibotAuthDatabase()
 chat_history_db = MongoDBChatHistory()
+otp_service = OTPService()
 
 # Store conversation histories for each user
 user_conversations = {}
@@ -93,7 +93,7 @@ def login_required(f):
     return decorated_function
 
 # Fallback medical response function
-def fallback_medical_response(message, sort_preference="rating", user_location=None):
+def fallback_medical_response(message, sort_preference="rating", user_location=None, show_table=True):
     """Fallback response when medical AI is not available - WITH DOCTOR RECOMMENDATIONS"""
     
     # Try to provide doctor recommendations even without OpenAI
@@ -170,7 +170,13 @@ def fallback_medical_response(message, sort_preference="rating", user_location=N
                 specialist_name = recommended_specialist.replace("_", " ").title()
                 response = f"<p>I understand you're having {message.lower()}. Let me help you find the right specialist for your condition.</p>\n"
                 response += f"<p>Based on your symptoms, I recommend consulting a <strong>{specialist_name}</strong>.</p>\n"
-                response += dr.format_doctor_recommendations(doctors, specialist_name)
+                
+                if show_table:
+                    response += dr.format_doctor_recommendations(doctors, specialist_name)
+                else:
+                    # Just show the recommendation without table - location prompt will handle the table
+                    response += f"<p>I can help you find {specialist_name.lower()}s in your area. Would you like to see nearby doctors or all available doctors?</p>"
+                
                 return response
         
         # No specialist match found
@@ -181,7 +187,7 @@ def fallback_medical_response(message, sort_preference="rating", user_location=N
             user_lng = user_location.get('longitude')
             
         doctors = dr.recommend_doctors(
-            "general physician", 
+            "general-physician", 
             "Bangalore", 
             limit=2, 
             sort_by=sort_preference,
@@ -217,7 +223,7 @@ def fallback_medical_response(message, sort_preference="rating", user_location=N
         try:
             from doctor_recommender import DoctorRecommender
             dr = DoctorRecommender()
-            doctors = dr.recommend_doctors("general physician", "Bangalore", limit=2)
+            doctors = dr.recommend_doctors("general-physician", "Bangalore", limit=2)
             if doctors:
                 response = "<p>I understand you have medical concerns. While our AI assistant is temporarily unavailable, I can help you find medical care.</p>\n"
                 response += "<p>I recommend starting with a <strong>General Physician</strong> who can evaluate your condition and refer you to a specialist if needed.</p>\n"
@@ -267,150 +273,19 @@ def test_chat_interface():
     from flask import send_from_directory
     return send_from_directory('.', 'test_chat_interface.html')
 
-# CHAT REDIRECT WITH SPECIALIST RECOMMENDATIONS
-@app.route('/chat-with-specialist')
-@login_required 
-def chat_with_specialist():
-    """Chat page with pre-loaded specialist recommendations"""
-    specialist_type = request.args.get('specialist', '')
-    analysis_data = request.args.get('analysis', '')
-    return render_template('chat.html', user=request.user, 
-                         preload_specialist=specialist_type,
-                         preload_analysis=analysis_data)
+# Doctor recommendations test page
+@app.route('/doctor-test')
+def doctor_test():
+    """Test page for doctor recommendations without authentication"""
+    from flask import send_from_directory
+    return send_from_directory('static', 'doctor_test.html')
 
-@app.route('/api/v1/redirect-to-chat', methods=['POST'])
-@login_required
-def api_redirect_to_chat():
-    """API endpoint to prepare chat redirect with specialist data"""
-    try:
-        data = request.get_json()
-        
-        specialist_type = data.get('specialist_type', '')
-        medical_analysis = data.get('medical_analysis', {})
-        doctor_recommendations = data.get('doctor_recommendations', {})
-        user_city = data.get('user_city', 'Bangalore')
-        symptoms = data.get('symptoms', '')
-        
-        # Create comprehensive chat message with specialist info
-        chat_message = _create_specialist_chat_message(
-            specialist_type, medical_analysis, doctor_recommendations, symptoms
-        )
-        
-        # Store chat context in session for the redirect
-        session_token = request.cookies.get('session_token')
-        if session_token:
-            # You can store this in a temporary cache/session for the redirect
-            # For now, we'll return it directly to the frontend
-            pass
-        
-        return jsonify({
-            'success': True,
-            'chat_message': chat_message,
-            'redirect_url': f'/chat?specialist={specialist_type}',
-            'specialist_type': specialist_type,
-            'total_doctors': doctor_recommendations.get('total_doctors_found', 0)
-        })
-        
-    except Exception as e:
-        print(f"❌ Chat redirect error: {e}")
-        return jsonify({
-            'success': False,
-            'error': str(e)
-        }), 500
-
-def _create_specialist_chat_message(specialist_type: str, medical_analysis: Dict[str, Any],
-                                  doctor_recommendations: Dict[str, Any], symptoms: str) -> str:
-    """Create comprehensive chat message with specialist recommendations"""
-    
-    specialist_name = specialist_type.replace('-', ' ').title()
-    
-    message_parts = [
-        f"🏥 **Medical Image Analysis Complete**",
-        f"",
-        f"Based on your medical image analysis, I recommend consulting a **{specialist_name}**.",
-        f""
-    ]
-    
-    # Add medical findings if available
-    if medical_analysis.get('visual_observations'):
-        message_parts.extend([
-            f"**Key Findings:**",
-            f"{medical_analysis['visual_observations'][:200]}...",
-            f""
-        ])
-    
-    # Add possible conditions
-    conditions = medical_analysis.get('possible_conditions', [])
-    if conditions:
-        message_parts.append("**Possible Conditions to Discuss:**")
-        for condition in conditions[:3]:
-            confidence = condition.get('confidence', 0)
-            name = condition.get('name', 'Unknown')
-            message_parts.append(f"• {name} ({confidence}% confidence)")
-        message_parts.append("")
-    
-    # Add questions for specialist
-    questions = medical_analysis.get('questions_for_specialist', [])
-    if questions:
-        message_parts.extend([
-            f"**Important Questions to Ask Your {specialist_name}:**"
-        ])
-        for i, question in enumerate(questions[:5], 1):
-            message_parts.append(f"{i}. {question}")
-        message_parts.append("")
-    
-    # Add doctor recommendations
-    primary_doctors = doctor_recommendations.get('primary_doctors', [])
-    if primary_doctors:
-        city = doctor_recommendations.get('city', 'your area')
-        message_parts.extend([
-            f"**I found {len(primary_doctors)} recommended {specialist_name}s in {city}:**",
-            f""
-        ])
-        
-        # Add top 3 doctors
-        for i, doctor in enumerate(primary_doctors[:3], 1):
-            name = doctor.get('name', 'Unknown')
-            hospital = doctor.get('hospital', 'N/A')
-            rating = doctor.get('rating', 'N/A')
-            experience = doctor.get('experience', 'N/A')
-            
-            message_parts.append(f"**{i}. Dr. {name}**")
-            message_parts.append(f"   🏥 {hospital}")
-            message_parts.append(f"   ⭐ Rating: {rating} | 📅 Experience: {experience}")
-            message_parts.append("")
-        
-        if len(primary_doctors) > 3:
-            remaining = len(primary_doctors) - 3
-            message_parts.append(f"*...and {remaining} more specialists available*")
-            message_parts.append("")
-    
-    # Add urgency information
-    urgency = medical_analysis.get('urgency_level', 'MODERATE')
-    if urgency == 'URGENT':
-        message_parts.extend([
-            f"🚨 **URGENT:** Please seek immediate medical attention.",
-            f"Consider visiting an emergency room or urgent care facility.",
-            f""
-        ])
-    elif urgency == 'MODERATE':
-        message_parts.extend([
-            f"📅 **Recommended:** Schedule an appointment within 1-2 weeks.",
-            f""
-        ])
-    
-    # Add next steps
-    message_parts.extend([
-        f"**Next Steps:**",
-        f"1. 📞 Contact one of the recommended {specialist_name}s",
-        f"2. 📋 Prepare the questions listed above",
-        f"3. 📸 Bring your medical images to the appointment",
-        f"4. 📝 Document any changes in symptoms",
-        f"",
-        f"Would you like me to help you with anything else regarding your consultation preparation?"
-    ])
-    
-    return '\n'.join(message_parts)
+# Direct test page
+@app.route('/test-direct')
+def test_direct():
+    """Direct test page for debugging"""
+    from flask import send_from_directory
+    return send_from_directory('.', 'test_direct.html')
 
 # Authentication Routes
 @app.route('/')
@@ -439,6 +314,31 @@ def register():
         return redirect(url_for('dashboard'))
     return render_template('register.html')
 
+@app.route('/verify-otp')
+def verify_otp():
+    """OTP verification page"""
+    email = request.args.get('email', '')
+    if not email:
+        return redirect(url_for('register'))
+    return render_template('verify_otp.html', email=email)
+
+@app.route('/forgot-password')
+def forgot_password():
+    """Forgot password page"""
+    # If already logged in, redirect to dashboard
+    session_token = request.cookies.get('session_token')
+    if session_token and auth_db.verify_session(session_token):
+        return redirect(url_for('dashboard'))
+    return render_template('forgot_password.html')
+
+@app.route('/reset-password')
+def reset_password():
+    """Reset password page"""
+    email = request.args.get('email', '')
+    if not email:
+        return redirect(url_for('forgot_password'))
+    return render_template('reset_password.html', email=email)
+
 @app.route('/api/register', methods=['POST'])
 def api_register():
     """Handle user registration"""
@@ -458,25 +358,256 @@ def api_register():
                 'message': 'All fields are required'
             }), 400
         
-        # Register user
-        success, message = auth_db.register_user(username, email, password, full_name)
-        
-        if success:
-            return jsonify({
-                'success': True,
-                'message': message
-            })
-        else:
+        # Check if user already exists
+        conn = auth_db.get_connection()
+        cursor = conn.cursor()
+        cursor.execute("SELECT id FROM users WHERE username = %s OR email = %s", (username, email))
+        if cursor.fetchone():
+            conn.close()
             return jsonify({
                 'success': False,
-                'message': message
+                'message': 'Username or email already exists'
             }), 400
+        conn.close()
+        
+        # Generate and send OTP
+        otp = otp_service.generate_otp()
+        print(f"🔑 Generated OTP: {otp} for email: {email}")
+        
+        otp_stored = otp_service.store_otp(email, otp, "registration")
+        
+        if not otp_stored:
+            print(f"❌ Failed to store OTP for {email}")
+            return jsonify({
+                'success': False,
+                'message': 'Failed to generate verification code. Please try again.'
+            }), 500
+        
+        # Send OTP email
+        print(f"📧 Sending OTP email to {email}")
+        email_sent = otp_service.send_otp_email(email, otp, "registration")
+        
+        if not email_sent:
+            return jsonify({
+                'success': False,
+                'message': 'Failed to send verification email. Please check your email address and try again.'
+            }), 500
+        
+        # Store user data temporarily for OTP verification
+        # In production, use Redis or database for temporary storage
+        if not hasattr(app, 'temp_registrations'):
+            app.temp_registrations = {}
+        
+        app.temp_registrations[email] = {
+            'full_name': full_name,
+            'username': username,
+            'password': password,
+            'created_at': time.time()
+        }
+        
+        return jsonify({
+            'success': True,
+            'message': 'Verification code sent to your email. Please check your inbox.',
+            'requires_verification': True
+        })
             
     except Exception as e:
         print(f"Registration error: {e}")
         return jsonify({
             'success': False,
             'message': 'Internal server error'
+        }), 500
+
+@app.route('/api/verify-otp', methods=['POST'])
+def api_verify_otp():
+    """Handle OTP verification for registration"""
+    try:
+        data = request.get_json()
+        email = data.get('email', '').strip()
+        otp = data.get('otp', '').strip()
+        
+        print(f"🔍 OTP verification request - Email: {email}, OTP: {otp}")
+        
+        if not email or not otp:
+            print(f"❌ Missing email or OTP - Email: {email}, OTP: {otp}")
+            return jsonify({
+                'success': False,
+                'message': 'Email and OTP are required'
+            }), 400
+        
+        # Verify OTP
+        print(f"🔍 Calling otp_service.verify_otp for {email}")
+        verification_result = otp_service.verify_otp(email, otp)
+        print(f"🔍 Verification result: {verification_result}")
+        
+        if not verification_result['success']:
+            return jsonify({
+                'success': False,
+                'message': verification_result['message'],
+                'remaining_attempts': verification_result.get('remaining_attempts', 0)
+            }), 400
+        
+        # Check if this is for registration
+        if verification_result.get('purpose') == 'registration':
+            # Get temporary registration data
+            if not hasattr(app, 'temp_registrations') or email not in app.temp_registrations:
+                return jsonify({
+                    'success': False,
+                    'message': 'Registration data not found. Please start registration again.'
+                }), 400
+            
+            temp_data = app.temp_registrations[email]
+            
+            # Check if data is not too old (1 hour)
+            if time.time() - temp_data['created_at'] > 3600:
+                del app.temp_registrations[email]
+                return jsonify({
+                    'success': False,
+                    'message': 'Registration session expired. Please start registration again.'
+                }), 400
+            
+            # Register user with email verified
+            success, message = auth_db.register_user(
+                temp_data['username'], 
+                email, 
+                temp_data['password'], 
+                temp_data['full_name'], 
+                email_verified=True
+            )
+            
+            if success:
+                # Clean up temporary data
+                del app.temp_registrations[email]
+                return jsonify({
+                    'success': True,
+                    'message': 'Account created successfully! You can now log in.'
+                })
+            else:
+                return jsonify({
+                    'success': False,
+                    'message': message
+                }), 400
+        
+        return jsonify({
+            'success': True,
+            'message': 'OTP verified successfully'
+        })
+        
+    except Exception as e:
+        print(f"OTP verification error: {e}")
+        return jsonify({
+            'success': False,
+            'message': 'Verification failed. Please try again.'
+        }), 500
+
+@app.route('/api/forgot-password', methods=['POST'])
+def api_forgot_password():
+    """Handle forgot password request"""
+    try:
+        data = request.get_json()
+        email = data.get('email', '').strip()
+        
+        if not email:
+            return jsonify({
+                'success': False,
+                'message': 'Email is required'
+            }), 400
+        
+        # Check if user exists
+        conn = auth_db.get_connection()
+        cursor = conn.cursor()
+        cursor.execute("SELECT id FROM users WHERE email = %s", (email,))
+        if not cursor.fetchone():
+            conn.close()
+            return jsonify({
+                'success': False,
+                'message': 'No account found with this email address'
+            }), 400
+        conn.close()
+        
+        # Generate and send OTP
+        otp = otp_service.generate_otp()
+        otp_stored = otp_service.store_otp(email, otp, "password_reset")
+        
+        if not otp_stored:
+            return jsonify({
+                'success': False,
+                'message': 'Failed to generate verification code. Please try again.'
+            }), 500
+        
+        # Send OTP email
+        print(f"📧 Attempting to send OTP email to {email}")
+        email_sent = otp_service.send_otp_email(email, otp, "password_reset")
+        print(f"📧 Email sending result: {email_sent}")
+        
+        if not email_sent:
+            print(f"❌ Failed to send OTP email to {email}")
+            return jsonify({
+                'success': False,
+                'message': 'Failed to send verification email. Please check your email address and try again.'
+            }), 500
+        
+        return jsonify({
+            'success': True,
+            'message': 'Password reset code sent to your email. Please check your inbox.'
+        })
+        
+    except Exception as e:
+        print(f"Forgot password error: {e}")
+        return jsonify({
+            'success': False,
+            'message': 'Request failed. Please try again.'
+        }), 500
+
+@app.route('/api/reset-password', methods=['POST'])
+def api_reset_password():
+    """Handle password reset without OTP verification (OTP already verified)"""
+    try:
+        data = request.get_json()
+        email = data.get('email', '').strip()
+        new_password = data.get('newPassword', '')
+        
+        print(f"🔑 Password reset request for email: {email}")
+        
+        if not all([email, new_password]):
+            return jsonify({
+                'success': False,
+                'message': 'Email and new password are required'
+            }), 400
+        
+        # Check if user exists
+        conn = auth_db.get_connection()
+        cursor = conn.cursor()
+        cursor.execute("SELECT id FROM users WHERE email = %s", (email,))
+        if not cursor.fetchone():
+            conn.close()
+            return jsonify({
+                'success': False,
+                'message': 'No account found with this email address'
+            }), 400
+        conn.close()
+        
+        # Reset password
+        success = auth_db.reset_user_password(email, new_password)
+        
+        if success:
+            print(f"✅ Password reset successful for {email}")
+            return jsonify({
+                'success': True,
+                'message': 'Password reset successfully'
+            })
+        else:
+            print(f"❌ Password reset failed for {email}")
+            return jsonify({
+                'success': False,
+                'message': 'Failed to reset password. Please try again.'
+            }), 500
+        
+    except Exception as e:
+        print(f"Reset password error: {e}")
+        return jsonify({
+            'success': False,
+            'message': 'Password reset failed. Please try again.'
         }), 500
 
 @app.route('/api/login', methods=['POST'])
@@ -631,11 +762,11 @@ def api_chat():
                 import traceback
                 traceback.print_exc()
                 print("🔄 Falling back to doctor recommendations system")
-                response = fallback_medical_response(message, sort_preference, user_location)
+                response = fallback_medical_response(message, sort_preference, user_location, show_table=False)
                 user_conversations[user_id].append((message, response))
         else:
             print("⚠ MedicalRecommender not available, using fallback system")
-            response = fallback_medical_response(message, sort_preference, user_location)
+            response = fallback_medical_response(message, sort_preference, user_location, show_table=False)
             user_conversations[user_id].append((message, response))
         
         print(f"✅ Generated response: {response[:100]}...")
@@ -711,7 +842,7 @@ def api_chat():
 @app.route('/api/reset', methods=['POST'])
 @login_required
 def api_reset():
-    """API endpoint to reset conversation - PROPERLY FIXED"""
+    """API endpoint to reset conversation - PROPERLY FIXED WITH NEW CONVERSATION ID"""
     try:
         user_id = request.user['id']
         
@@ -726,7 +857,41 @@ def api_reset():
         user_conversations[user_id] = []
         print(f"✅ Re-initialized empty conversation for user {user_id}")
         
-        # 3. Reset the MedicalRecommender instance if needed
+        # 3. Create a NEW conversation ID for the user session
+        session_token = request.cookies.get('session_token')
+        if session_token:
+            try:
+                # Create a new session with a new conversation ID
+                new_session_token = auth_db.create_session(user_id)
+                if new_session_token:
+                    print(f"✅ Created new session with new conversation ID")
+                    
+                    # Return the new session token so frontend can update the cookie
+                    response = make_response(jsonify({
+                        'success': True,
+                        'message': 'Conversation reset successfully with new conversation ID',
+                        'user_id': user_id,
+                        'conversation_cleared': True,
+                        'new_session_token': new_session_token,
+                        'recommender_reset': medical_functions_available
+                    }))
+                    
+                    # Set the new session cookie
+                    response.set_cookie(
+                        'session_token', 
+                        new_session_token, 
+                        httponly=True,
+                        secure=False,  # Set to True in production with HTTPS
+                        samesite='Lax'
+                    )
+                    
+                    return response
+                else:
+                    print("⚠️ Failed to create new session, continuing with existing session")
+            except Exception as e:
+                print(f"⚠️ Failed to create new session: {e}, continuing with existing session")
+        
+        # 4. Reset the MedicalRecommender instance if needed
         global medical_recommender
         if medical_functions_available:
             try:
@@ -1103,7 +1268,7 @@ def skin_analyzer():
 @app.route('/api/v1/analyze-skin', methods=['POST'])
 @login_required
 def api_analyze_skin():
-    """Enhanced API endpoint for medical image analysis with specialist recommendations"""
+    """API endpoint for skin condition analysis"""
     try:
         # Check if image file is present
         if 'image' not in request.files:
@@ -1123,724 +1288,51 @@ def api_analyze_skin():
         # Read image data
         image_data = image_file.read()
         
-        # Get additional parameters
-        user_city = request.form.get('city', 'Bangalore')
-        image_type = request.form.get('image_type', None)  # Don't default to 'skin'!
-        context = request.form.get('context', '')
-        symptoms = request.form.get('symptoms', '')
-        use_enhanced_analysis = request.form.get('enhanced', 'true').lower() == 'true'
+        # Get user city from form data if provided
+        user_city = request.form.get('city', None)
         
-        # CRITICAL FIX: ALWAYS run intelligent image type detection to override wrong user selection
-        try:
-            from src.ai.medical_image_router import MedicalImageRouter
-            router = MedicalImageRouter()
-            detected_type = router.detect_image_type(image_data, f"{context} {symptoms}")
-            
-            # If auto-detection found a specific type, use it (override user selection)
-            if detected_type and detected_type != 'general':
-                if image_type != detected_type:
-                    print(f"� OVERRIDING user selection '{image_type}' with auto-detected '{detected_type}'")
-                image_type = detected_type
-            elif not image_type or image_type == 'other':
-                # Only use fallback if user didn't specify or said 'other'
-                image_type = detected_type or 'general'
-            
-            print(f"🔍 Final image type: {image_type} (user selected: {request.form.get('image_type', 'None')})")
-        except Exception as e:
-            print(f"⚠️ Image type detection failed: {e}")
-            if not image_type:
-                image_type = 'general'
-        
-        print(f"🔬 Analyzing medical image for user {request.user['id']}")
+        print(f"🔬 Analyzing skin image for user {request.user['id']}")
         print(f"   Image size: {len(image_data)} bytes")
-        print(f"   Image type: {image_type}")
-        print(f"   Context: {context}")
-        print(f"   Symptoms: {symptoms}")
         print(f"   User city: {user_city}")
-        print(f"   Enhanced analysis: {use_enhanced_analysis}")
         
-        if use_enhanced_analysis:
-            # NEW: Enhanced Analysis with Doctor Integration
-            try:
-                from src.ai.enhanced_medical_analysis import EnhancedMedicalAnalysis
-                enhanced_analyzer = EnhancedMedicalAnalysis()
+        # Import and use skin analyzer
+        try:
+            from src.ai.skin_analyzer import analyze_skin_image
+            result = analyze_skin_image(image_data, user_city)
+            
+            if result['success']:
+                print(f"✅ Skin analysis completed successfully")
+                print(f"   Found {len(result['analysis']['conditions'])} potential conditions")
+                print(f"   Recommended specialist: {result['analysis']['specialist_type']}")
+                print(f"   Found {len(result['analysis']['doctors'])} doctors")
                 
-                enhanced_result = enhanced_analyzer.analyze_with_doctor_integration(
-                    image_data=image_data,
-                    image_type=image_type,
-                    symptoms=symptoms,
-                    context=context,
-                    user_city=user_city
-                )
+                return jsonify(result)
+            else:
+                print(f"❌ Skin analysis failed: {result.get('error', 'Unknown error')}")
+                return jsonify(result), 400
                 
-                if enhanced_result.get('success'):
-                    analysis_data = enhanced_result['enhanced_analysis']
-                    
-                    # Format doctor recommendations for frontend
-                    # Format doctor recommendations for frontend (but won't display table)
-                    doctor_recs = analysis_data.get('doctor_recommendations', {})
-                    primary_doctors = doctor_recs.get('primary_doctors', [])
-                    
-                    return jsonify({
-                        'success': True,
-                        'analysis_type': 'enhanced_with_doctors',
-                        'medical_analysis': analysis_data['medical_analysis'],
-                        'specialist_recommendation': analysis_data['specialist_recommendation'],
-                        'doctor_recommendations': doctor_recs,
-                        'chat_redirect': analysis_data['chat_redirect'],
-                        'next_steps': analysis_data['next_steps'],
-                        'urgency_level': analysis_data['urgency_level'],
-                        'confidence_score': int(analysis_data['confidence_score'] * 100),
-                        'image_type': image_type,
-                        'timestamp': analysis_data['timestamp']
-                    })
-                else:
-                    print(f"⚠️ Enhanced analysis failed: {enhanced_result.get('error', 'Unknown error')}")
-                    # Fall back to fast analysis
-                    use_enhanced_analysis = False
-                    
-            except Exception as e:
-                print(f"❌ Enhanced analysis error: {e}")
-                # Fall back to fast analysis
-                use_enhanced_analysis = False
-        
-        if not use_enhanced_analysis:
-            # FAST Analysis Pipeline - Original system
-            analysis_results = {}
-            
-            # 1. Image type detection using router
-            try:
-                from src.ai.medical_image_router import route_medical_image
-                routing_result = route_medical_image(
-                    image_data=image_data, 
-                    image_type=image_type, 
-                    context=context,
-                    symptoms=symptoms,
-                    specialty=None,
-                    user_city=user_city
-                )
-                
-                if routing_result['success']:
-                    detected_type = routing_result['image_type']
-                    detection_confidence = routing_result['confidence']
-                    analysis_results['routing'] = routing_result
-                    print(f"✅ Image type detected: {detected_type} (confidence: {detection_confidence}%)")
-                else:
-                    detected_type = image_type or 'unknown'
-                    detection_confidence = 50
-                    print(f"⚠️ Image type detection failed, using: {detected_type}")
-                    
-            except Exception as e:
-                print(f"❌ Image routing failed: {e}")
-                detected_type = image_type or 'skin'  # Default to skin
-                detection_confidence = 30
-            
-            # 2. FAST Medical AI Analysis 
-            try:
-                from src.ai.fast_medical_ai import analyze_medical_image_fast
-                fast_result = analyze_medical_image_fast(
-                    image_data, detected_type, symptoms, context
-                )
-                analysis_results['fast_medical_ai'] = fast_result
-                print(f"✅ Fast Medical AI analysis completed in {fast_result.get('processing_time_ms', 0)}ms")
-                
-            except Exception as e:
-                print(f"⚠️ Fast Medical AI failed: {e}")
-                analysis_results['fast_medical_ai'] = {'error': str(e)}
-            
-            # 3. Backup analysis (if fast AI failed)
-            if 'error' in analysis_results.get('fast_medical_ai', {}):
-                print("🔄 Fast AI failed, attempting backup analysis...")
-                try:
-                    # Simple fallback using basic image analysis
-                    fallback_result = {
-                        'success': True,
-                        'condition': f"Possible {detected_type} condition requiring examination",
-                        'confidence': 0.3,
-                        'urgency': 'moderate',
-                        'recommendations': [
-                            f"Professional {detected_type} examination recommended",
-                            "Monitor symptoms for changes",
-                            "Consider specialist consultation"
-                        ],
-                        'analysis_method': 'fallback_basic'
-                    }
-                    
-                    analysis_results['fallback_analysis'] = fallback_result
-                    print(f"✅ Fallback analysis completed")
-                    
-                except Exception as e:
-                    print(f"⚠️ Fallback analysis failed: {e}")
-                    analysis_results['fallback_analysis'] = {'error': str(e)}
-            
-            # 4. Final result compilation - Fast Analysis
-            final_analysis = _combine_fast_medical_analysis(
-                analysis_results, detected_type, symptoms
-            )
-            
-            # Add metadata
-            final_analysis['timestamp'] = str(datetime.now())
-            final_analysis['user_id'] = request.user['id']
-            final_analysis['image_type'] = detected_type
-            final_analysis['detection_confidence'] = detection_confidence
-            final_analysis['presentation_mode'] = True  # Flag for fast analysis
-            
+        except ImportError as e:
+            print(f"❌ Skin analyzer import error: {e}")
             return jsonify({
-                'success': True,
-                'analysis_type': 'fast_analysis',
-                'image_type': detected_type,
-                'detection_confidence': detection_confidence,
-                'analysis': final_analysis,
-                'fast_analysis': True,
-                'processing_time_ms': analysis_results.get('fast_medical_ai', {}).get('processing_time_ms', 0),
-                'analysis_methods': ['fast_medical_ai', 'image_routing']
-            })
-        
+                'success': False,
+                'message': 'Skin analyzer not available'
+            }), 500
+        except Exception as e:
+            print(f"❌ Skin analysis error: {e}")
+            import traceback
+            traceback.print_exc()
+            return jsonify({
+                'success': False,
+                'message': f'Analysis failed: {str(e)}'
+            }), 500
+    
     except Exception as e:
-        print(f"❌ Medical image analysis error: {e}")
+        print(f"❌ API Error in /api/v1/analyze-skin: {e}")
+        import traceback
+        traceback.print_exc()
         return jsonify({
             'success': False,
-            'message': f'Analysis failed: {str(e)}'
-        }), 500
-
-def _combine_medical_analysis_results(analysis_results: dict, image_type: str, symptoms: str = "") -> dict:
-    """
-    Combine multiple analysis results into comprehensive medical analysis
-    
-    Args:
-        analysis_results: Dictionary containing all analysis results
-        image_type: Detected image type
-        symptoms: Patient symptoms
-        
-    Returns:
-        Combined comprehensive analysis
-    """
-    try:
-        final_analysis = {
-            'analysis_type': 'Multi-Modal Enhanced Medical Analysis',
-            'image_type': image_type,
-            'analysis_methods': [],
-            'conditions': [],
-            'recommendations': [],
-            'confidence_scores': {},
-            'specialist_needed': 'General Practitioner',
-            'urgency_level': 'MODERATE',
-            'summary': '',
-            'model_insights': {}
-        }
-        
-        # Process VLM analysis (NEW)
-        vlm_result = analysis_results.get('vlm_analysis', {})
-        if vlm_result.get('success') and not vlm_result.get('error'):
-            final_analysis['analysis_methods'].append('vision_language_model')
-            if 'analysis' in vlm_result:
-                vlm_analysis = vlm_result['analysis']
-                if 'conditions' in vlm_analysis:
-                    final_analysis['conditions'].extend(vlm_analysis['conditions'])
-                final_analysis['model_insights']['vlm'] = {
-                    'model_used': vlm_result.get('model_used', 'unknown'),
-                    'confidence': vlm_analysis.get('overall_confidence', 70),
-                    'description': vlm_analysis.get('image_description', ''),
-                    'correlation': vlm_analysis.get('symptom_correlation', {})
-                }
-            final_analysis['confidence_scores']['vlm'] = 85
-        
-        # Process Specialized model analysis (CheXNet, DermNet, etc.)
-        specialized_result = analysis_results.get('specialized_model', {})
-        if specialized_result.get('success') and not specialized_result.get('error'):
-            final_analysis['analysis_methods'].append('specialized_medical_model')
-            if 'predictions' in specialized_result:
-                for pred in specialized_result['predictions']:
-                    final_analysis['conditions'].append({
-                        'name': pred.get('condition', 'Unknown'),
-                        'confidence': pred.get('confidence', 0),
-                        'severity': pred.get('severity', 'Unknown'),
-                        'source': 'specialized_model',
-                        'recommendation': pred.get('recommendation', '')
-                    })
-            final_analysis['model_insights']['specialized'] = {
-                'model_used': specialized_result.get('selected_model', 'unknown'),
-                'model_name': specialized_result.get('model_name', ''),
-                'selection_reason': specialized_result.get('selection_reason', '')
-            }
-            final_analysis['confidence_scores']['specialized'] = 90
-        
-        # Process Lightweight AI analysis (NEW FALLBACK)
-        lightweight_result = analysis_results.get('lightweight_ai', {})
-        if lightweight_result.get('success') and not lightweight_result.get('error'):
-            final_analysis['analysis_methods'].append('lightweight_medical_ai')
-            if 'predicted_condition' in lightweight_result:
-                final_analysis['conditions'].append({
-                    'name': lightweight_result['predicted_condition'],
-                    'confidence': lightweight_result.get('confidence', 0),
-                    'severity': lightweight_result.get('severity', 'Unknown'),
-                    'source': 'lightweight_ai',
-                    'recommendation': lightweight_result.get('primary_recommendation', '')
-                })
-            
-            # Add computer vision analysis insights
-            if 'computer_vision_analysis' in lightweight_result:
-                cv_analysis = lightweight_result['computer_vision_analysis']
-                final_analysis['model_insights']['lightweight_cv'] = {
-                    'visual_features': cv_analysis.get('visual_features', {}),
-                    'color_analysis': cv_analysis.get('color_analysis', {}),
-                    'texture_analysis': cv_analysis.get('texture_analysis', {}),
-                    'shape_analysis': cv_analysis.get('shape_analysis', {})
-                }
-            
-            # Add medical rules analysis
-            if 'medical_rules_analysis' in lightweight_result:
-                rules_analysis = lightweight_result['medical_rules_analysis']
-                final_analysis['model_insights']['medical_rules'] = {
-                    'matching_conditions': rules_analysis.get('matching_conditions', []),
-                    'symptom_matches': rules_analysis.get('symptom_matches', []),
-                    'rule_confidence': rules_analysis.get('confidence', 0)
-                }
-            
-            final_analysis['confidence_scores']['lightweight'] = lightweight_result.get('confidence', 70)
-        
-        # Process specialist analysis
-        specialist_result = analysis_results.get('specialist_analysis', {})
-        if specialist_result.get('success') and not specialist_result.get('error'):
-            final_analysis['analysis_methods'].append('specialist_ai_model')
-            if 'conditions' in specialist_result:
-                final_analysis['conditions'].extend(specialist_result['conditions'])
-            final_analysis['confidence_scores']['specialist'] = 80
-            if 'specialty' in specialist_result:
-                final_analysis['specialist_needed'] = specialist_result['specialty'].title()
-        
-        # Process traditional analysis
-        traditional_result = analysis_results.get('traditional_analysis', {})
-        if traditional_result and traditional_result.get('success'):
-            final_analysis['analysis_methods'].append('traditional_analysis')
-            if 'analysis' in traditional_result and 'conditions' in traditional_result['analysis']:
-                final_analysis['conditions'].extend(traditional_result['analysis']['conditions'])
-            final_analysis['confidence_scores']['traditional'] = traditional_result.get('confidence', 70)
-        
-        # Process LLM analysis
-        llm_result = analysis_results.get('llm_analysis', {})
-        if llm_result.get('success') and 'analysis' in llm_result:
-            final_analysis['analysis_methods'].append('llm_enhanced')
-            llm_analysis = llm_result['analysis']
-            
-            # Add LLM predictions
-            if 'condition_predictions' in llm_analysis:
-                final_analysis['conditions'].extend(llm_analysis['condition_predictions'])
-            
-            # Add urgency assessment
-            if 'urgency_assessment' in llm_analysis:
-                urgency = llm_analysis['urgency_assessment']
-                final_analysis['urgency_level'] = urgency.get('urgency_level', 'MODERATE')
-                final_analysis['urgency_details'] = urgency
-            
-            # Add specialist recommendation
-            if 'specialist_recommendation' in llm_analysis:
-                specialist_rec = llm_analysis['specialist_recommendation']
-                if specialist_rec.get('confidence', 0) > 70:
-                    final_analysis['specialist_needed'] = specialist_rec.get('primary_specialist', 'General Practitioner')
-            
-            final_analysis['confidence_scores']['llm'] = 75
-        
-        # Remove duplicates and rank conditions
-        unique_conditions = {}
-        for condition in final_analysis['conditions']:
-            name = condition.get('name', 'Unknown').lower()
-            confidence = condition.get('confidence', 0)
-            
-            if name not in unique_conditions or confidence > unique_conditions[name].get('confidence', 0):
-                unique_conditions[name] = condition
-        
-        final_analysis['conditions'] = sorted(
-            list(unique_conditions.values()),
-            key=lambda x: x.get('confidence', 0),
-            reverse=True
-        )[:7]  # Top 7 conditions
-        
-        # Generate enhanced recommendations
-        final_analysis['recommendations'] = _generate_enhanced_medical_recommendations(
-            final_analysis['conditions'],
-            final_analysis.get('urgency_details', {}),
-            final_analysis['specialist_needed'],
-            final_analysis['model_insights'],
-            symptoms
-        )
-        
-        # Calculate overall confidence with weighted scoring
-        confidence_weights = {
-            'specialized': 0.25,   # High weight for specialized models
-            'vlm': 0.20,          # High weight for VLM  
-            'lightweight': 0.25,   # High weight for lightweight AI (when used as primary)
-            'specialist': 0.15,    # Medium weight for specialist models
-            'llm': 0.10,          # Medium weight for LLM
-            'traditional': 0.05   # Lower weight for traditional
-        }
-        
-        weighted_confidence = 0
-        total_weight = 0
-        for method, score in final_analysis['confidence_scores'].items():
-            weight = confidence_weights.get(method, 0.1)
-            weighted_confidence += score * weight
-            total_weight += weight
-        
-        final_analysis['overall_confidence'] = weighted_confidence / total_weight if total_weight > 0 else 50
-        
-        # Generate comprehensive summary
-        final_analysis['summary'] = _generate_enhanced_analysis_summary(final_analysis)
-        
-        return final_analysis
-        
-    except Exception as e:
-        print(f"Error combining enhanced medical analysis results: {e}")
-        return {
-            'analysis_type': 'Basic Analysis (Error Recovery)',
-            'error': 'Failed to combine analysis results',
-            'image_type': image_type,
-            'analysis_methods': ['error_recovery'],
-            'conditions': [],
-            'recommendations': ['Consult healthcare provider for proper evaluation'],
-            'specialist_needed': 'General Practitioner'
-        }
-
-def _combine_fast_medical_analysis(analysis_results: dict, image_type: str, symptoms: str = "") -> dict:
-    """
-    Combine fast medical AI analysis results for presentation purposes
-    
-    Args:
-        analysis_results: Dictionary containing fast analysis results
-        image_type: Detected image type
-        symptoms: Patient symptoms
-        
-    Returns:
-        Combined fast analysis optimized for presentations
-    """
-    try:
-        # Get fast medical AI result (primary)
-        fast_result = analysis_results.get('fast_medical_ai', {})
-        
-        if fast_result.get('success') and not fast_result.get('error'):
-            # Use fast AI results directly
-            final_analysis = {
-                'analysis_type': 'Fast Medical AI Analysis (Presentation Mode)',
-                'image_type': image_type,
-                'analysis_methods': ['fast_medical_ai'],
-                'conditions': fast_result.get('conditions', []),
-                'recommendations': fast_result.get('recommendations', []),
-                'confidence_score': fast_result.get('confidence', 0.7),
-                'specialist_needed': fast_result.get('specialist_recommendation', 'General Practitioner'),
-                'urgency_level': fast_result.get('urgency', 'MODERATE').upper(),
-                'summary': fast_result.get('analysis_summary', 'Fast medical analysis completed'),
-                'processing_time_ms': fast_result.get('processing_time_ms', 0),
-                'overall_confidence': int(fast_result.get('confidence', 0.7) * 100)
-            }
-            
-            # Add routing information if available
-            routing_result = analysis_results.get('routing', {})
-            if routing_result.get('success'):
-                final_analysis['detection_details'] = {
-                    'confidence': routing_result.get('confidence', 0),
-                    'method': 'ai_router'
-                }
-                final_analysis['analysis_methods'].append('image_routing')
-            
-        else:
-            # Use fallback analysis if fast AI failed
-            fallback_result = analysis_results.get('fallback_analysis', {})
-            if fallback_result.get('success'):
-                final_analysis = {
-                    'analysis_type': 'Fallback Medical Analysis',
-                    'image_type': image_type,
-                    'analysis_methods': ['fallback_basic'],
-                    'conditions': [{
-                        'name': fallback_result.get('condition', 'Unknown condition'),
-                        'confidence': fallback_result.get('confidence', 0.3),
-                        'source': 'fallback'
-                    }],
-                    'recommendations': fallback_result.get('recommendations', []),
-                    'confidence_score': fallback_result.get('confidence', 0.3),
-                    'specialist_needed': 'General Practitioner',
-                    'urgency_level': fallback_result.get('urgency', 'MODERATE').upper(),
-                    'summary': 'Basic analysis performed - professional evaluation recommended',
-                    'overall_confidence': int(fallback_result.get('confidence', 0.3) * 100)
-                }
-            else:
-                # Last resort - minimal analysis
-                final_analysis = {
-                    'analysis_type': 'Minimal Analysis (Backup)',
-                    'image_type': image_type,
-                    'analysis_methods': ['minimal_backup'],
-                    'conditions': [{
-                        'name': f'Possible {image_type} condition',
-                        'confidence': 0.2,
-                        'source': 'minimal'
-                    }],
-                    'recommendations': [
-                        'Professional medical evaluation required',
-                        'Bring image to healthcare provider',
-                        'Monitor symptoms'
-                    ],
-                    'confidence_score': 0.2,
-                    'specialist_needed': 'General Practitioner',
-                    'urgency_level': 'MODERATE',
-                    'summary': 'Image received - professional evaluation recommended',
-                    'overall_confidence': 20
-                }
-        
-        return final_analysis
-        
-    except Exception as e:
-        print(f"Error combining fast medical analysis results: {e}")
-        return {
-            'analysis_type': 'Error Recovery Analysis',
-            'error': 'Failed to combine fast analysis results',
-            'image_type': image_type,
-            'analysis_methods': ['error_recovery'],
-            'conditions': [],
-            'recommendations': ['Consult healthcare provider for proper evaluation'],
-            'specialist_needed': 'General Practitioner',
-            'overall_confidence': 0
-        }
-
-def _generate_medical_recommendations(conditions: list, urgency: dict, specialist: str, symptoms: str = "") -> list:
-    """Generate comprehensive medical recommendations"""
-    recommendations = []
-    
-    # Urgency-based recommendations
-    urgency_level = urgency.get('urgency_level', 'MODERATE')
-    if urgency_level == 'URGENT':
-        recommendations.append('🚨 Seek immediate medical attention')
-        recommendations.append('Consider emergency room or urgent care')
-    elif urgency_level == 'MODERATE':
-        recommendations.append('📅 Schedule appointment within 1-2 weeks')
-    else:
-        recommendations.append('📋 Routine medical consultation recommended')
-    
-    # Specialist recommendation
-    if specialist and specialist != 'General Practitioner':
-        recommendations.append(f'👨‍⚕️ Consultation with {specialist} recommended')
-    
-    # Condition-specific recommendations
-    if conditions:
-        top_condition = conditions[0]
-        confidence = top_condition.get('confidence', 0)
-        condition_name = top_condition.get('name', 'Unknown condition')
-        
-        if confidence > 80:
-            recommendations.append(f'🎯 High confidence finding: {condition_name}')
-        elif confidence > 60:
-            recommendations.append(f'🤔 Possible condition: {condition_name}')
-        else:
-            recommendations.append('❓ Multiple possibilities - professional evaluation needed')
-    
-    # General medical recommendations
-    recommendations.extend([
-        '📸 Document any changes in appearance',
-        '📝 Bring image and symptoms to appointment',
-        '⚠️ Monitor for worsening symptoms'
-    ])
-    
-    return recommendations[:7]  # Limit to 7 recommendations
-
-def _generate_analysis_summary(analysis: dict) -> str:
-    """Generate a comprehensive analysis summary"""
-    try:
-        image_type = analysis.get('image_type', 'unknown')
-        methods = analysis.get('analysis_methods', [])
-        conditions = analysis.get('conditions', [])
-        specialist = analysis.get('specialist_needed', 'General Practitioner')
-        urgency = analysis.get('urgency_level', 'MODERATE')
-        confidence = analysis.get('overall_confidence', 50)
-        
-        summary_parts = []
-        
-        # Analysis overview
-        summary_parts.append(f"Analysis of {image_type} image completed using {len(methods)} methods.")
-        
-        # Key findings
-        if conditions:
-            top_condition = conditions[0]
-            summary_parts.append(f"Primary finding: {top_condition.get('name', 'Unknown')} "
-                               f"(confidence: {top_condition.get('confidence', 0):.0f}%).")
-        else:
-            summary_parts.append("No specific conditions identified.")
-        
-        # Recommendations
-        if urgency == 'URGENT':
-            summary_parts.append("⚠️ Urgent medical attention recommended.")
-        elif specialist != 'General Practitioner':
-            summary_parts.append(f"Recommend consultation with {specialist}.")
-        else:
-            summary_parts.append("Routine medical evaluation suggested.")
-        
-        # Confidence note
-        if confidence > 75:
-            summary_parts.append("High confidence in analysis results.")
-        elif confidence > 50:
-            summary_parts.append("Moderate confidence - additional evaluation recommended.")
-        else:
-            summary_parts.append("Low confidence - professional medical assessment essential.")
-        
-        return " ".join(summary_parts)
-        
-    except Exception as e:
-        return f"Analysis completed. Professional medical evaluation recommended for accurate diagnosis."
-
-def _generate_enhanced_medical_recommendations(conditions: list, urgency: dict, specialist: str, 
-                                            model_insights: dict, symptoms: str = "") -> list:
-    """Generate enhanced medical recommendations based on all analysis methods"""
-    recommendations = []
-    
-    # Urgency-based recommendations
-    urgency_level = urgency.get('urgency_level', 'MODERATE')
-    if urgency_level == 'URGENT':
-        recommendations.append('🚨 URGENT: Seek immediate medical attention')
-        recommendations.append('🏥 Consider emergency room or urgent care')
-    elif urgency_level == 'MODERATE':
-        recommendations.append('📅 Schedule appointment within 1-2 weeks')
-    else:
-        recommendations.append('📋 Routine medical consultation recommended')
-    
-    # Model-specific insights
-    if 'specialized' in model_insights:
-        specialized = model_insights['specialized']
-        model_name = specialized.get('model_name', 'Specialized model')
-        recommendations.append(f'🤖 {model_name} analysis completed')
-    
-    if 'vlm' in model_insights:
-        vlm = model_insights['vlm']
-        correlation = vlm.get('correlation', {})
-        if correlation.get('strength', 0) > 70:
-            recommendations.append('✅ Strong correlation between symptoms and image findings')
-        elif correlation.get('strength', 0) < 40:
-            recommendations.append('⚠️ Symptoms may not fully match visual findings')
-    
-    # Specialist recommendation
-    if specialist and specialist != 'General Practitioner':
-        recommendations.append(f'👨‍⚕️ Consultation with {specialist} recommended')
-    
-    # Condition-specific recommendations
-    if conditions:
-        top_condition = conditions[0]
-        confidence = top_condition.get('confidence', 0)
-        condition_name = top_condition.get('name', 'Unknown condition')
-        source = top_condition.get('source', 'analysis')
-        
-        if confidence > 85:
-            recommendations.append(f'🎯 High confidence finding: {condition_name} ({source})')
-        elif confidence > 65:
-            recommendations.append(f'🤔 Probable condition: {condition_name} ({source})')
-        else:
-            recommendations.append('❓ Multiple possibilities - professional evaluation needed')
-    
-    # Enhanced medical recommendations
-    recommendations.extend([
-        '📸 Document any changes in appearance or symptoms',
-        '📱 Bring this analysis report to your appointment',
-        '⚠️ Monitor for worsening or new symptoms'
-    ])
-    
-    return recommendations[:8]  # Limit to 8 recommendations
-
-def _generate_enhanced_analysis_summary(analysis: dict) -> str:
-    """Generate enhanced comprehensive analysis summary"""
-    try:
-        image_type = analysis.get('image_type', 'unknown')
-        methods = analysis.get('analysis_methods', [])
-        conditions = analysis.get('conditions', [])
-        specialist = analysis.get('specialist_needed', 'General Practitioner')
-        urgency = analysis.get('urgency_level', 'MODERATE')
-        confidence = analysis.get('overall_confidence', 50)
-        model_insights = analysis.get('model_insights', {})
-        
-        summary_parts = []
-        
-        # Analysis overview
-        if 'vision_language_model' in methods and 'specialized_medical_model' in methods:
-            summary_parts.append(f"Advanced multi-modal analysis of {image_type} image using {len(methods)} AI methods including Vision-Language Models and specialized medical AI.")
-        elif len(methods) > 3:
-            summary_parts.append(f"Comprehensive analysis of {image_type} image using {len(methods)} advanced AI methods.")
-        else:
-            summary_parts.append(f"Analysis of {image_type} image completed using {len(methods)} methods.")
-        
-        # Model insights
-        if 'specialized' in model_insights:
-            specialized = model_insights['specialized']
-            model_used = specialized.get('model_used', 'unknown')
-            if model_used in ['chexnet', 'dermnet', 'fastmri', 'retina_net']:
-                summary_parts.append(f"Specialized {model_used.upper()} model provided targeted analysis.")
-        
-        if 'vlm' in model_insights:
-            vlm = model_insights['vlm']
-            correlation = vlm.get('correlation', {})
-            if correlation.get('strength', 0) > 70:
-                summary_parts.append("Vision-Language Model found strong symptom-image correlation.")
-        
-        # Key findings
-        if conditions:
-            top_condition = conditions[0]
-            condition_name = top_condition.get('name', 'Unknown')
-            condition_confidence = top_condition.get('confidence', 0)
-            source = top_condition.get('source', 'analysis')
-            
-            if source == 'specialized_model':
-                summary_parts.append(f"Primary finding from specialized medical AI: {condition_name} "
-                                   f"(confidence: {condition_confidence:.0f}%).")
-            else:
-                summary_parts.append(f"Primary finding: {condition_name} "
-                                   f"(confidence: {condition_confidence:.0f}%).")
-        else:
-            summary_parts.append("No specific conditions identified with high confidence.")
-        
-        # Urgency and recommendations
-        if urgency == 'URGENT':
-            summary_parts.append("⚠️ URGENT medical attention recommended.")
-        elif specialist != 'General Practitioner':
-            summary_parts.append(f"Recommend consultation with {specialist}.")
-        else:
-            summary_parts.append("Medical evaluation suggested for confirmation.")
-        
-        # Confidence assessment
-        if confidence > 80:
-            summary_parts.append("High confidence in analysis results from multiple AI models.")
-        elif confidence > 65:
-            summary_parts.append("Good confidence in analysis - consider professional confirmation.")
-        elif confidence > 50:
-            summary_parts.append("Moderate confidence - professional medical assessment recommended.")
-        else:
-            summary_parts.append("Low confidence - professional medical assessment essential.")
-        
-        return " ".join(summary_parts)
-        
-    except Exception as e:
-        return f"Enhanced AI analysis completed using multiple models. Professional medical evaluation recommended for accurate diagnosis."
-
-        # 7. Combine all results
-        final_analysis = _combine_medical_analysis_results(
-            analysis_results, detected_type, symptoms
-        )
-        
-        # Add metadata
-        final_analysis['timestamp'] = str(datetime.now())
-        final_analysis['user_id'] = request.user['id']
-        final_analysis['image_type'] = detected_type
-        final_analysis['detection_confidence'] = detection_confidence
-        
-        return jsonify({
-            'success': True,
-            'image_type': detected_type,
-            'detection_confidence': detection_confidence,
-            'analysis': final_analysis,
-            'detailed_results': analysis_results,
-            'specialist_used': analysis_results.get('specialist_analysis', {}).get('specialty', 'none'),
-            'vlm_used': analysis_results.get('vlm_analysis', {}).get('model_used', 'none'),
-            'specialized_model': analysis_results.get('specialized_model', {}).get('selected_model', 'none'),
-            'analysis_methods': final_analysis.get('analysis_methods', [])
-        })
-        
-    except Exception as e:
-        print(f"❌ Medical image analysis error: {e}")
-        return jsonify({
-            'success': False,
-            'message': f'Analysis failed: {str(e)}'
+            'message': 'Internal server error'
         }), 500
 
 def run_gradio():
@@ -2059,6 +1551,53 @@ def api_delete_conversation(conversation_id):
     except Exception as e:
         print(f"Delete conversation error: {e}")
         return jsonify({'error': 'Failed to delete conversation'}), 500
+
+@app.route('/api/doctors/sort', methods=['POST'])
+@login_required
+def api_sort_doctors():
+    """Dynamic doctor sorting endpoint"""
+    try:
+        data = request.get_json()
+        specialty = data.get('specialty', '').strip()
+        sort_by = data.get('sort_by', 'rating')
+        user_location = data.get('userLocation', None)
+        user_city = data.get('city', 'Bangalore')
+        
+        if not specialty:
+            return jsonify({'error': 'Specialty is required'}), 400
+        
+        print(f"🔄 Dynamic sorting request: {specialty} by {sort_by}")
+        
+        # Use fallback medical response to get doctor recommendations
+        response = fallback_medical_response(
+            f"Show me {specialty} recommendations", 
+            sort_preference=sort_by, 
+            user_location=user_location
+        )
+        
+        # If this is a location-based request, ensure the response includes location info
+        if sort_by == "location" and user_location:
+            # Add location context to the response
+            response = response.replace(
+                "Based on your symptoms, I recommend consulting a",
+                f"Based on your symptoms and your location ({user_location.get('latitude', 0):.4f}, {user_location.get('longitude', 0):.4f}), I recommend consulting a"
+            )
+        
+        return jsonify({
+            'success': True,
+            'response': response,
+            'specialty': specialty,
+            'sort_by': sort_by
+        })
+        
+    except Exception as e:
+        print(f"❌ Dynamic sorting error: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({
+            'success': False,
+            'error': 'Failed to sort doctors'
+        }), 500
 
 # ============================================
 # Application Startup

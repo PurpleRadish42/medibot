@@ -72,11 +72,21 @@ class MedibotAuthDatabase:
                     password_hash VARCHAR(64) NOT NULL,
                     salt VARCHAR(64) NOT NULL,
                     full_name VARCHAR(100) NOT NULL,
+                    email_verified BOOLEAN DEFAULT FALSE,
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
                     is_active BOOLEAN DEFAULT TRUE
                 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
             """)
+            
+            # Add email_verified column if it doesn't exist (for existing databases)
+            try:
+                cursor.execute("ALTER TABLE users ADD COLUMN email_verified BOOLEAN DEFAULT FALSE")
+                print("✅ Added email_verified column to users table")
+            except Exception as e:
+                # Column might already exist, which is fine
+                if "Duplicate column name" not in str(e):
+                    print(f"⚠️  Could not add email_verified column: {e}")
             print("✅ Users table created/verified")
             
             # Create user_sessions table
@@ -176,8 +186,8 @@ class MedibotAuthDatabase:
         """Validate password strength - simplified to just length requirement"""
         return len(password) >= 8
     
-    def register_user(self, username, email, password, full_name):
-        """Register a new user"""
+    def register_user(self, username, email, password, full_name, email_verified=False):
+        """Register a new user with optional email verification"""
         try:
             # Validate inputs
             if not username or not email or not password or not full_name:
@@ -201,22 +211,74 @@ class MedibotAuthDatabase:
                 conn.close()
                 return False, "Username or email already exists"
             
-            # Insert new user
+            # Insert new user with email verification status
             cursor.execute("""
-                INSERT INTO users (username, email, password_hash, salt, full_name)
-                VALUES (%s, %s, %s, %s, %s)
-            """, (username, email, password_hash, salt, full_name))
+                INSERT INTO users (username, email, password_hash, salt, full_name, email_verified)
+                VALUES (%s, %s, %s, %s, %s, %s)
+            """, (username, email, password_hash, salt, full_name, email_verified))
             
             conn.commit()
             user_id = cursor.lastrowid
             conn.close()
             
-            print(f"User {username} registered successfully with ID {user_id}")
+            print(f"User {username} registered successfully with ID {user_id} (verified: {email_verified})")
             return True, f"User {username} registered successfully"
             
         except Exception as e:
             print(f"Registration error: {str(e)}")
             return False, f"Registration failed: {str(e)}"
+    
+    def verify_user_email(self, email):
+        """Mark user email as verified"""
+        try:
+            conn = self.get_connection()
+            cursor = conn.cursor()
+            
+            cursor.execute("""
+                UPDATE users SET email_verified = 1 WHERE email = %s
+            """, (email,))
+            
+            if cursor.rowcount > 0:
+                conn.commit()
+                conn.close()
+                print(f"Email verified for user: {email}")
+                return True, "Email verified successfully"
+            else:
+                conn.close()
+                return False, "User not found"
+                
+        except Exception as e:
+            print(f"Email verification error: {str(e)}")
+            return False, f"Email verification failed: {str(e)}"
+    
+    def reset_user_password(self, email, new_password):
+        """Reset user password"""
+        try:
+            if not self.validate_password(new_password):
+                return False, "Password must be at least 8 characters long"
+            
+            # Hash new password
+            password_hash, salt = self.hash_password(new_password)
+            
+            conn = self.get_connection()
+            cursor = conn.cursor()
+            
+            cursor.execute("""
+                UPDATE users SET password_hash = %s, salt = %s WHERE email = %s
+            """, (password_hash, salt, email))
+            
+            if cursor.rowcount > 0:
+                conn.commit()
+                conn.close()
+                print(f"Password reset for user: {email}")
+                return True, "Password reset successfully"
+            else:
+                conn.close()
+                return False, "User not found"
+                
+        except Exception as e:
+            print(f"Password reset error: {str(e)}")
+            return False, f"Password reset failed: {str(e)}"
     
     def authenticate_user(self, username_or_email, password):
         """Authenticate user login"""

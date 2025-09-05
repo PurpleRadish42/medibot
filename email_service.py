@@ -1,5 +1,5 @@
 """
-Email Service for MediBot
+Email Service for MediGuide
 Handles sending doctor recommendations via email using SMTP2GO
 """
 import os
@@ -22,8 +22,66 @@ class EmailService:
         self.smtp_port = int(os.getenv('SMTP_PORT', '587'))
         self.smtp_username = os.getenv('SMTP_USERNAME', '')
         self.smtp_password = os.getenv('SMTP_PASSWORD', '')
-        self.from_email = os.getenv('FROM_EMAIL', 'noreply@medibot.ai')
+        self.from_email = os.getenv('FROM_EMAIL', 'noreply@mediguide.ai')
         
+        # Check if SMTP credentials are configured
+        if not self.smtp_username or not self.smtp_password:
+            print("⚠️  WARNING: SMTP credentials not configured!")
+            print("📧 To enable email sending, set the following environment variables:")
+            print("   SMTP_USERNAME=your_smtp2go_username")
+            print("   SMTP_PASSWORD=your_smtp2go_password")
+            print("   FROM_EMAIL=noreply@yourdomain.com")
+            print("📧 Emails will not be sent until credentials are configured.")
+        
+    def send_email(self, to_email: str, subject: str, html_content: str) -> bool:
+        """
+        Send email with custom subject and HTML content
+        
+        Args:
+            to_email: Recipient email address
+            subject: Email subject
+            html_content: HTML content of the email
+            
+        Returns:
+            bool: True if email sent successfully, False otherwise
+        """
+        try:
+            # Check if SMTP credentials are configured
+            if not self.smtp_username or not self.smtp_password:
+                print(f"❌ Cannot send email: SMTP credentials not configured")
+                print(f"📧 Email would have been sent to: {to_email}")
+                print(f"📧 Subject: {subject}")
+                return False
+                
+            # Validate email address
+            if not self._is_valid_email(to_email):
+                print(f"❌ Invalid email address: {to_email}")
+                return False
+                
+            # Create message
+            message = MIMEMultipart("alternative")
+            message["Subject"] = subject
+            message["From"] = self.from_email
+            message["To"] = to_email
+            
+            # Create HTML part
+            html_part = MIMEText(html_content, "html")
+            message.attach(html_part)
+            
+            # Send email
+            context = ssl.create_default_context()
+            with smtplib.SMTP(self.smtp_server, self.smtp_port) as server:
+                server.starttls(context=context)
+                server.login(self.smtp_username, self.smtp_password)
+                server.sendmail(self.from_email, to_email, message.as_string())
+            
+            print(f"✅ Email sent successfully to {to_email}")
+            return True
+            
+        except Exception as e:
+            print(f"❌ Error sending email: {e}")
+            return False
+
     def send_doctor_recommendations(self, to_email: str, doctor_table_html: str, user_query: str = "") -> bool:
         """
         Send doctor recommendations via email
@@ -43,7 +101,7 @@ class EmailService:
                 return False
                 
             # Create email content
-            subject = "🏥 Your Doctor Recommendations from MediBot AI"
+            subject = "🏥 Your Doctor Recommendations from MediGuide"
             html_content = self._create_email_template(doctor_table_html, user_query)
             
             # Create message
@@ -76,7 +134,7 @@ class EmailService:
         <head>
             <meta charset="UTF-8">
             <meta name="viewport" content="width=device-width, initial-scale=1.0">
-            <title>Doctor Recommendations - MediBot AI</title>
+            <title>Doctor Recommendations - MediGuide</title>
             <style>
                 body {{
                     margin: 0;
@@ -154,16 +212,24 @@ class EmailService:
                     margin: 20px 0;
                     font-size: 14px;
                 }}
+                /* Table container with horizontal scroll */
+                .table-container {{
+                    overflow-x: auto !important;
+                    margin: 20px 0 !important;
+                    border-radius: 8px !important;
+                    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1) !important;
+                    background: white !important;
+                }}
+                
                 /* Override table styles for email */
                 table {{
-                    width: 100% !important;
+                    width: max-content !important;
+                    min-width: 100% !important;
                     border-collapse: collapse !important;
-                    margin: 20px 0 !important;
+                    margin: 0 !important;
                     font-size: 14px !important;
                     background: white !important;
                     border-radius: 8px !important;
-                    overflow: hidden !important;
-                    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1) !important;
                 }}
                 th {{
                     background: linear-gradient(45deg, #4facfe, #00f2fe) !important;
@@ -173,13 +239,29 @@ class EmailService:
                     font-weight: bold !important;
                     font-size: 13px !important;
                     border: 1px solid #dee2e6 !important;
+                    white-space: nowrap !important;
+                    min-width: 80px !important;
                 }}
                 td {{
                     padding: 10px 8px !important;
                     border: 1px solid #dee2e6 !important;
                     font-size: 13px !important;
                     vertical-align: top !important;
+                    white-space: nowrap !important;
+                    min-width: 80px !important;
                 }}
+                /* Specific column widths for better layout */
+                td:nth-child(1), th:nth-child(1) {{ min-width: 40px !important; }} /* # column */
+                td:nth-child(2), th:nth-child(2) {{ min-width: 150px !important; }} /* Doctor Name */
+                td:nth-child(3), th:nth-child(3) {{ min-width: 100px !important; }} /* Specialty */
+                td:nth-child(4), th:nth-child(4) {{ min-width: 120px !important; }} /* Qualification */
+                td:nth-child(5), th:nth-child(5) {{ min-width: 80px !important; }} /* Experience */
+                td:nth-child(6), th:nth-child(6) {{ min-width: 100px !important; }} /* Fee */
+                td:nth-child(7), th:nth-child(7) {{ min-width: 60px !important; }} /* Rating */
+                td:nth-child(8), th:nth-child(8) {{ min-width: 80px !important; }} /* Distance */
+                td:nth-child(9), th:nth-child(9) {{ min-width: 150px !important; }} /* Location */
+                td:nth-child(10), th:nth-child(10) {{ min-width: 100px !important; }} /* Profile */
+                td:nth-child(11), th:nth-child(11) {{ min-width: 100px !important; }} /* Maps */
                 tr:nth-child(even) {{
                     background-color: #f8f9fa !important;
                 }}
@@ -199,19 +281,21 @@ class EmailService:
         <body>
             <div class="container">
                 <div class="header">
-                    <h1>🏥 MediBot AI</h1>
+                    <h1>🏥 MediGuide</h1>
                     <p>Your Personalized Doctor Recommendations</p>
                 </div>
                 
                 <div class="content">
                     <p>Dear Patient,</p>
-                    <p>Thank you for using MediBot AI. Based on your consultation, we have prepared personalized doctor recommendations for you.</p>
+                    <p>Thank you for using MediGuide. Based on your consultation, we have prepared personalized doctor recommendations for you.</p>
                     
                     {f'<div class="query-box"><h3>📝 Your Query:</h3><p>{user_query}</p></div>' if user_query else ''}
                     
                     <div class="recommendations">
                         <h2>👨‍⚕️ Recommended Doctors</h2>
-                        {table_content}
+                        <div class="table-container">
+                            {table_content}
+                        </div>
                     </div>
                     
                     <div class="disclaimer">
@@ -222,7 +306,7 @@ class EmailService:
                 </div>
                 
                 <div class="footer">
-                    <p><strong>MediBot AI</strong> - Your AI Medical Assistant</p>
+                    <p><strong>MediGuide</strong> - Your AI Medical Assistant</p>
                     <p>Generated on {current_date}</p>
                     <p>This email was sent because you requested doctor recommendations through our platform.</p>
                 </div>
