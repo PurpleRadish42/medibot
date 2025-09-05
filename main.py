@@ -1,5 +1,6 @@
 import sys
 import os
+from typing import Dict, Any, List
 from pathlib import Path
 from functools import wraps
 import threading
@@ -266,19 +267,150 @@ def test_chat_interface():
     from flask import send_from_directory
     return send_from_directory('.', 'test_chat_interface.html')
 
-# Doctor recommendations test page
-@app.route('/doctor-test')
-def doctor_test():
-    """Test page for doctor recommendations without authentication"""
-    from flask import send_from_directory
-    return send_from_directory('static', 'doctor_test.html')
+# CHAT REDIRECT WITH SPECIALIST RECOMMENDATIONS
+@app.route('/chat-with-specialist')
+@login_required 
+def chat_with_specialist():
+    """Chat page with pre-loaded specialist recommendations"""
+    specialist_type = request.args.get('specialist', '')
+    analysis_data = request.args.get('analysis', '')
+    return render_template('chat.html', user=request.user, 
+                         preload_specialist=specialist_type,
+                         preload_analysis=analysis_data)
 
-# Direct test page
-@app.route('/test-direct')
-def test_direct():
-    """Direct test page for debugging"""
-    from flask import send_from_directory
-    return send_from_directory('.', 'test_direct.html')
+@app.route('/api/v1/redirect-to-chat', methods=['POST'])
+@login_required
+def api_redirect_to_chat():
+    """API endpoint to prepare chat redirect with specialist data"""
+    try:
+        data = request.get_json()
+        
+        specialist_type = data.get('specialist_type', '')
+        medical_analysis = data.get('medical_analysis', {})
+        doctor_recommendations = data.get('doctor_recommendations', {})
+        user_city = data.get('user_city', 'Bangalore')
+        symptoms = data.get('symptoms', '')
+        
+        # Create comprehensive chat message with specialist info
+        chat_message = _create_specialist_chat_message(
+            specialist_type, medical_analysis, doctor_recommendations, symptoms
+        )
+        
+        # Store chat context in session for the redirect
+        session_token = request.cookies.get('session_token')
+        if session_token:
+            # You can store this in a temporary cache/session for the redirect
+            # For now, we'll return it directly to the frontend
+            pass
+        
+        return jsonify({
+            'success': True,
+            'chat_message': chat_message,
+            'redirect_url': f'/chat?specialist={specialist_type}',
+            'specialist_type': specialist_type,
+            'total_doctors': doctor_recommendations.get('total_doctors_found', 0)
+        })
+        
+    except Exception as e:
+        print(f"❌ Chat redirect error: {e}")
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+def _create_specialist_chat_message(specialist_type: str, medical_analysis: Dict[str, Any],
+                                  doctor_recommendations: Dict[str, Any], symptoms: str) -> str:
+    """Create comprehensive chat message with specialist recommendations"""
+    
+    specialist_name = specialist_type.replace('-', ' ').title()
+    
+    message_parts = [
+        f"🏥 **Medical Image Analysis Complete**",
+        f"",
+        f"Based on your medical image analysis, I recommend consulting a **{specialist_name}**.",
+        f""
+    ]
+    
+    # Add medical findings if available
+    if medical_analysis.get('visual_observations'):
+        message_parts.extend([
+            f"**Key Findings:**",
+            f"{medical_analysis['visual_observations'][:200]}...",
+            f""
+        ])
+    
+    # Add possible conditions
+    conditions = medical_analysis.get('possible_conditions', [])
+    if conditions:
+        message_parts.append("**Possible Conditions to Discuss:**")
+        for condition in conditions[:3]:
+            confidence = condition.get('confidence', 0)
+            name = condition.get('name', 'Unknown')
+            message_parts.append(f"• {name} ({confidence}% confidence)")
+        message_parts.append("")
+    
+    # Add questions for specialist
+    questions = medical_analysis.get('questions_for_specialist', [])
+    if questions:
+        message_parts.extend([
+            f"**Important Questions to Ask Your {specialist_name}:**"
+        ])
+        for i, question in enumerate(questions[:5], 1):
+            message_parts.append(f"{i}. {question}")
+        message_parts.append("")
+    
+    # Add doctor recommendations
+    primary_doctors = doctor_recommendations.get('primary_doctors', [])
+    if primary_doctors:
+        city = doctor_recommendations.get('city', 'your area')
+        message_parts.extend([
+            f"**I found {len(primary_doctors)} recommended {specialist_name}s in {city}:**",
+            f""
+        ])
+        
+        # Add top 3 doctors
+        for i, doctor in enumerate(primary_doctors[:3], 1):
+            name = doctor.get('name', 'Unknown')
+            hospital = doctor.get('hospital', 'N/A')
+            rating = doctor.get('rating', 'N/A')
+            experience = doctor.get('experience', 'N/A')
+            
+            message_parts.append(f"**{i}. Dr. {name}**")
+            message_parts.append(f"   🏥 {hospital}")
+            message_parts.append(f"   ⭐ Rating: {rating} | 📅 Experience: {experience}")
+            message_parts.append("")
+        
+        if len(primary_doctors) > 3:
+            remaining = len(primary_doctors) - 3
+            message_parts.append(f"*...and {remaining} more specialists available*")
+            message_parts.append("")
+    
+    # Add urgency information
+    urgency = medical_analysis.get('urgency_level', 'MODERATE')
+    if urgency == 'URGENT':
+        message_parts.extend([
+            f"🚨 **URGENT:** Please seek immediate medical attention.",
+            f"Consider visiting an emergency room or urgent care facility.",
+            f""
+        ])
+    elif urgency == 'MODERATE':
+        message_parts.extend([
+            f"📅 **Recommended:** Schedule an appointment within 1-2 weeks.",
+            f""
+        ])
+    
+    # Add next steps
+    message_parts.extend([
+        f"**Next Steps:**",
+        f"1. 📞 Contact one of the recommended {specialist_name}s",
+        f"2. 📋 Prepare the questions listed above",
+        f"3. 📸 Bring your medical images to the appointment",
+        f"4. 📝 Document any changes in symptoms",
+        f"",
+        f"Would you like me to help you with anything else regarding your consultation preparation?"
+    ])
+    
+    return '\n'.join(message_parts)
 
 # Authentication Routes
 @app.route('/')
@@ -971,7 +1103,7 @@ def skin_analyzer():
 @app.route('/api/v1/analyze-skin', methods=['POST'])
 @login_required
 def api_analyze_skin():
-    """Enhanced API endpoint for medical image analysis"""
+    """Enhanced API endpoint for medical image analysis with specialist recommendations"""
     try:
         # Check if image file is present
         if 'image' not in request.files:
@@ -992,104 +1124,177 @@ def api_analyze_skin():
         image_data = image_file.read()
         
         # Get additional parameters
-        user_city = request.form.get('city', None)
-        image_type = request.form.get('image_type', None)
-        context = request.form.get('context', None)
+        user_city = request.form.get('city', 'Bangalore')
+        image_type = request.form.get('image_type', None)  # Don't default to 'skin'!
+        context = request.form.get('context', '')
         symptoms = request.form.get('symptoms', '')
-        specialty = request.form.get('specialty', None)
+        use_enhanced_analysis = request.form.get('enhanced', 'true').lower() == 'true'
+        
+        # CRITICAL FIX: ALWAYS run intelligent image type detection to override wrong user selection
+        try:
+            from src.ai.medical_image_router import MedicalImageRouter
+            router = MedicalImageRouter()
+            detected_type = router.detect_image_type(image_data, f"{context} {symptoms}")
+            
+            # If auto-detection found a specific type, use it (override user selection)
+            if detected_type and detected_type != 'general':
+                if image_type != detected_type:
+                    print(f"� OVERRIDING user selection '{image_type}' with auto-detected '{detected_type}'")
+                image_type = detected_type
+            elif not image_type or image_type == 'other':
+                # Only use fallback if user didn't specify or said 'other'
+                image_type = detected_type or 'general'
+            
+            print(f"🔍 Final image type: {image_type} (user selected: {request.form.get('image_type', 'None')})")
+        except Exception as e:
+            print(f"⚠️ Image type detection failed: {e}")
+            if not image_type:
+                image_type = 'general'
         
         print(f"🔬 Analyzing medical image for user {request.user['id']}")
         print(f"   Image size: {len(image_data)} bytes")
         print(f"   Image type: {image_type}")
         print(f"   Context: {context}")
         print(f"   Symptoms: {symptoms}")
-        print(f"   Requested specialty: {specialty}")
         print(f"   User city: {user_city}")
+        print(f"   Enhanced analysis: {use_enhanced_analysis}")
         
-        # FAST Analysis Pipeline - Optimized for Presentations
-        analysis_results = {}
-        
-        # 1. Image type detection using router
-        try:
-            from src.ai.medical_image_router import route_medical_image
-            routing_result = route_medical_image(image_data, image_type, symptoms)
-            
-            if routing_result['success']:
-                detected_type = routing_result['image_type']
-                detection_confidence = routing_result['confidence']
-                analysis_results['routing'] = routing_result
-                print(f"✅ Image type detected: {detected_type} (confidence: {detection_confidence}%)")
-            else:
-                detected_type = image_type or 'unknown'
-                detection_confidence = 50
-                print(f"⚠️ Image type detection failed, using: {detected_type}")
-                
-        except Exception as e:
-            print(f"❌ Image routing failed: {e}")
-            detected_type = image_type or 'skin'  # Default to skin
-            detection_confidence = 30
-        
-        # 2. FAST Medical AI Analysis (PRIMARY - for presentations)
-        try:
-            from src.ai.fast_medical_ai import analyze_medical_image_fast
-            fast_result = analyze_medical_image_fast(
-                image_data, detected_type, symptoms, context
-            )
-            analysis_results['fast_medical_ai'] = fast_result
-            print(f"✅ Fast Medical AI analysis completed in {fast_result.get('processing_time_ms', 0)}ms")
-            
-        except Exception as e:
-            print(f"⚠️ Fast Medical AI failed: {e}")
-            analysis_results['fast_medical_ai'] = {'error': str(e)}
-        
-        # 3. Backup analysis (if fast AI failed)
-        if 'error' in analysis_results.get('fast_medical_ai', {}):
-            print("🔄 Fast AI failed, attempting backup analysis...")
+        if use_enhanced_analysis:
+            # NEW: Enhanced Analysis with Doctor Integration
             try:
-                import io
-                # Simple fallback using basic image analysis
-                # Basic image feature analysis
-                fallback_result = {
-                    'success': True,
-                    'condition': f"Possible {detected_type} condition requiring examination",
-                    'confidence': 0.3,
-                    'urgency': 'moderate',
-                    'recommendations': [
-                        f"Professional {detected_type} examination recommended",
-                        "Monitor symptoms for changes",
-                        "Consider specialist consultation"
-                    ],
-                    'analysis_method': 'fallback_basic'
-                }
+                from src.ai.enhanced_medical_analysis import EnhancedMedicalAnalysis
+                enhanced_analyzer = EnhancedMedicalAnalysis()
                 
-                analysis_results['fallback_analysis'] = fallback_result
-                print(f"✅ Fallback analysis completed")
+                enhanced_result = enhanced_analyzer.analyze_with_doctor_integration(
+                    image_data=image_data,
+                    image_type=image_type,
+                    symptoms=symptoms,
+                    context=context,
+                    user_city=user_city
+                )
+                
+                if enhanced_result.get('success'):
+                    analysis_data = enhanced_result['enhanced_analysis']
+                    
+                    # Format doctor recommendations for frontend
+                    # Format doctor recommendations for frontend (but won't display table)
+                    doctor_recs = analysis_data.get('doctor_recommendations', {})
+                    primary_doctors = doctor_recs.get('primary_doctors', [])
+                    
+                    return jsonify({
+                        'success': True,
+                        'analysis_type': 'enhanced_with_doctors',
+                        'medical_analysis': analysis_data['medical_analysis'],
+                        'specialist_recommendation': analysis_data['specialist_recommendation'],
+                        'doctor_recommendations': doctor_recs,
+                        'chat_redirect': analysis_data['chat_redirect'],
+                        'next_steps': analysis_data['next_steps'],
+                        'urgency_level': analysis_data['urgency_level'],
+                        'confidence_score': int(analysis_data['confidence_score'] * 100),
+                        'image_type': image_type,
+                        'timestamp': analysis_data['timestamp']
+                    })
+                else:
+                    print(f"⚠️ Enhanced analysis failed: {enhanced_result.get('error', 'Unknown error')}")
+                    # Fall back to fast analysis
+                    use_enhanced_analysis = False
+                    
+            except Exception as e:
+                print(f"❌ Enhanced analysis error: {e}")
+                # Fall back to fast analysis
+                use_enhanced_analysis = False
+        
+        if not use_enhanced_analysis:
+            # FAST Analysis Pipeline - Original system
+            analysis_results = {}
+            
+            # 1. Image type detection using router
+            try:
+                from src.ai.medical_image_router import route_medical_image
+                routing_result = route_medical_image(
+                    image_data=image_data, 
+                    image_type=image_type, 
+                    context=context,
+                    symptoms=symptoms,
+                    specialty=None,
+                    user_city=user_city
+                )
+                
+                if routing_result['success']:
+                    detected_type = routing_result['image_type']
+                    detection_confidence = routing_result['confidence']
+                    analysis_results['routing'] = routing_result
+                    print(f"✅ Image type detected: {detected_type} (confidence: {detection_confidence}%)")
+                else:
+                    detected_type = image_type or 'unknown'
+                    detection_confidence = 50
+                    print(f"⚠️ Image type detection failed, using: {detected_type}")
+                    
+            except Exception as e:
+                print(f"❌ Image routing failed: {e}")
+                detected_type = image_type or 'skin'  # Default to skin
+                detection_confidence = 30
+            
+            # 2. FAST Medical AI Analysis 
+            try:
+                from src.ai.fast_medical_ai import analyze_medical_image_fast
+                fast_result = analyze_medical_image_fast(
+                    image_data, detected_type, symptoms, context
+                )
+                analysis_results['fast_medical_ai'] = fast_result
+                print(f"✅ Fast Medical AI analysis completed in {fast_result.get('processing_time_ms', 0)}ms")
                 
             except Exception as e:
-                print(f"⚠️ Fallback analysis failed: {e}")
-                analysis_results['fallback_analysis'] = {'error': str(e)}
-        
-        # 4. Final result compilation - Optimized for Fast Analysis
-        final_analysis = _combine_fast_medical_analysis(
-            analysis_results, detected_type, symptoms
-        )
-        
-        # Add metadata
-        final_analysis['timestamp'] = str(datetime.now())
-        final_analysis['user_id'] = request.user['id']
-        final_analysis['image_type'] = detected_type
-        final_analysis['detection_confidence'] = detection_confidence
-        final_analysis['presentation_mode'] = True  # Flag for fast analysis
-        
-        return jsonify({
-            'success': True,
-            'image_type': detected_type,
-            'detection_confidence': detection_confidence,
-            'analysis': final_analysis,
-            'fast_analysis': True,
-            'processing_time_ms': analysis_results.get('fast_medical_ai', {}).get('processing_time_ms', 0),
-            'analysis_methods': ['fast_medical_ai', 'image_routing']
-        })
+                print(f"⚠️ Fast Medical AI failed: {e}")
+                analysis_results['fast_medical_ai'] = {'error': str(e)}
+            
+            # 3. Backup analysis (if fast AI failed)
+            if 'error' in analysis_results.get('fast_medical_ai', {}):
+                print("🔄 Fast AI failed, attempting backup analysis...")
+                try:
+                    # Simple fallback using basic image analysis
+                    fallback_result = {
+                        'success': True,
+                        'condition': f"Possible {detected_type} condition requiring examination",
+                        'confidence': 0.3,
+                        'urgency': 'moderate',
+                        'recommendations': [
+                            f"Professional {detected_type} examination recommended",
+                            "Monitor symptoms for changes",
+                            "Consider specialist consultation"
+                        ],
+                        'analysis_method': 'fallback_basic'
+                    }
+                    
+                    analysis_results['fallback_analysis'] = fallback_result
+                    print(f"✅ Fallback analysis completed")
+                    
+                except Exception as e:
+                    print(f"⚠️ Fallback analysis failed: {e}")
+                    analysis_results['fallback_analysis'] = {'error': str(e)}
+            
+            # 4. Final result compilation - Fast Analysis
+            final_analysis = _combine_fast_medical_analysis(
+                analysis_results, detected_type, symptoms
+            )
+            
+            # Add metadata
+            final_analysis['timestamp'] = str(datetime.now())
+            final_analysis['user_id'] = request.user['id']
+            final_analysis['image_type'] = detected_type
+            final_analysis['detection_confidence'] = detection_confidence
+            final_analysis['presentation_mode'] = True  # Flag for fast analysis
+            
+            return jsonify({
+                'success': True,
+                'analysis_type': 'fast_analysis',
+                'image_type': detected_type,
+                'detection_confidence': detection_confidence,
+                'analysis': final_analysis,
+                'fast_analysis': True,
+                'processing_time_ms': analysis_results.get('fast_medical_ai', {}).get('processing_time_ms', 0),
+                'analysis_methods': ['fast_medical_ai', 'image_routing']
+            })
         
     except Exception as e:
         print(f"❌ Medical image analysis error: {e}")

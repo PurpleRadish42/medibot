@@ -22,32 +22,42 @@ try:
 except ImportError:
     SKIN_ANALYZER_AVAILABLE = False
 
-# Medical image type detection
+# Enhanced medical image type detection
 IMAGE_TYPES = {
     'skin': {
-        'keywords': ['skin', 'mole', 'rash', 'lesion', 'dermatology', 'acne', 'eczema'],
+        'keywords': ['skin', 'mole', 'rash', 'lesion', 'dermatology', 'acne', 'eczema', 'psoriasis', 'melanoma', 'dermatitis'],
         'analyzer': 'skin_analyzer',
         'description': 'Skin condition and dermatological analysis'
     },
+    'bone': {
+        'keywords': ['fracture', 'broken', 'bone', 'joint', 'orthopedic', 'spine', 'limb', 'ankle', 'wrist', 'femur', 'tibia', 'radius', 'ulna', 'humerus'],
+        'analyzer': 'bone_analyzer',
+        'description': 'Bone fracture and orthopedic analysis'
+    },
     'xray': {
-        'keywords': ['xray', 'x-ray', 'chest', 'bone', 'fracture', 'pneumonia'],
+        'keywords': ['xray', 'x-ray', 'chest', 'pneumonia', 'lung', 'ribs', 'thorax', 'radiograph'],
         'analyzer': 'xray_analyzer',
         'description': 'X-ray and radiological image analysis'
     },
     'eyes': {
-        'keywords': ['eye', 'retina', 'ophthalmology', 'vision', 'cataract'],
+        'keywords': ['eye', 'retina', 'ophthalmology', 'vision', 'cataract', 'fundus', 'glaucoma', 'macula'],
         'analyzer': 'ophthalmology_analyzer', 
         'description': 'Eye and retinal image analysis'
     },
     'mri': {
-        'keywords': ['mri', 'brain', 'spine', 'magnetic', 'resonance'],
+        'keywords': ['mri', 'brain', 'spine', 'magnetic', 'resonance', 'neurological', 'head', 'cranial'],
         'analyzer': 'mri_analyzer',
         'description': 'MRI scan analysis'
     },
     'ct': {
-        'keywords': ['ct', 'scan', 'computed', 'tomography'],
+        'keywords': ['ct', 'scan', 'computed', 'tomography', 'abdomen', 'pelvis', 'thorax'],
         'analyzer': 'ct_analyzer',
         'description': 'CT scan analysis'
+    },
+    'normal': {
+        'keywords': ['selfie', 'portrait', 'normal', 'healthy', 'routine', 'check-up', 'general', 'no symptoms'],
+        'analyzer': 'general_analyzer',
+        'description': 'Normal image or general health assessment'
     }
 }
 
@@ -62,82 +72,143 @@ class MedicalImageRouter:
         
     def detect_image_type(self, image_data: bytes, context: str = None) -> str:
         """
-        Detect the type of medical image with improved accuracy
-        
-        Args:
-            image_data: Raw image bytes
-            context: Optional context or description from user
-            
-        Returns:
-            Detected image type
+        ENHANCED INTELLIGENT IMAGE TYPE DETECTION
+        Uses multiple detection methods: Context + Visual Analysis + AI
         """
         try:
-            # Analyze context first - this is most reliable
-            if context:
-                context_lower = context.lower()
+            self.logger.info(f"🔍 Starting intelligent image detection...")
+            self.logger.info(f"   Context: '{context}'")
+            
+            # METHOD 1: STRONG CONTEXT ANALYSIS (Most Reliable)
+            detected_type = self._analyze_context_keywords(context)
+            if detected_type:
+                self.logger.info(f"✅ Context detection: {detected_type}")
+                return detected_type
+            
+            # METHOD 2: VISUAL IMAGE ANALYSIS
+            try:
+                image = Image.open(io.BytesIO(image_data))
                 
-                # Strong context indicators
-                skin_keywords = ['skin', 'face', 'mole', 'rash', 'acne', 'eczema', 'dermatitis', 'spot', 'blemish', 'pimple']
-                xray_keywords = ['xray', 'x-ray', 'chest', 'lung', 'bone', 'fracture', 'radiograph']
-                eye_keywords = ['eye', 'retina', 'vision', 'pupil', 'iris']
+                # CRITICAL: Check if this looks like a normal photo/selfie FIRST
+                if self._is_normal_photo(image):
+                    self.logger.info(f"✅ Visual detection: normal photo/selfie")
+                    return 'normal'
                 
-                # Check for skin-related context
-                if any(keyword in context_lower for keyword in skin_keywords):
-                    return 'skin'
-                
-                # Check for X-ray context
-                if any(keyword in context_lower for keyword in xray_keywords):
-                    return 'xray'
+                # Check for medical image characteristics
+                visual_type = self._analyze_visual_features(image)
+                if visual_type:
+                    self.logger.info(f"✅ Visual detection: {visual_type}")
+                    return visual_type
                     
-                # Check for eye context
-                if any(keyword in context_lower for keyword in eye_keywords):
-                    return 'eyes'
+            except Exception as e:
+                self.logger.warning(f"Visual analysis failed: {e}")
             
-            # Image analysis for type detection
-            image = Image.open(io.BytesIO(image_data))
-            width, height = image.size
+            # METHOD 3: DEFAULT INTELLIGENT FALLBACK
+            fallback_type = self._intelligent_fallback(context)
+            self.logger.info(f"⚠️ Using fallback detection: {fallback_type}")
+            return fallback_type
             
-            # Convert to numpy for analysis
+        except Exception as e:
+            self.logger.error(f"Image type detection failed: {e}")
+            return 'normal'  # Safe fallback
+    
+    def _analyze_context_keywords(self, context: str) -> str:
+        """Analyze context for strong indicators"""
+        if not context:
+            return None
+            
+        context_lower = context.lower()
+        
+        # BONE/FRACTURE - Highest priority for medical images
+        bone_keywords = ['fracture', 'broken', 'bone', 'x-ray', 'xray', 'radiograph', 'orthopedic', 'joint', 'spine', 'limb', 'break']
+        if any(keyword in context_lower for keyword in bone_keywords):
+            return 'bone'
+        
+        # CHEST/LUNG X-RAYS
+        chest_keywords = ['chest', 'lung', 'pneumonia', 'respiratory', 'breathing', 'thorax', 'ribs']
+        if any(keyword in context_lower for keyword in chest_keywords):
+            return 'xray'
+        
+        # SKIN CONDITIONS
+        skin_keywords = ['skin', 'mole', 'rash', 'acne', 'eczema', 'dermatitis', 'lesion', 'spot', 'blemish', 'pimple', 'melanoma']
+        if any(keyword in context_lower for keyword in skin_keywords):
+            return 'skin'
+        
+        # EYE CONDITIONS
+        eye_keywords = ['eye', 'retina', 'vision', 'pupil', 'iris', 'fundus', 'glaucoma', 'cataract']
+        if any(keyword in context_lower for keyword in eye_keywords):
+            return 'eyes'
+        
+        # BRAIN/NEUROLOGICAL
+        brain_keywords = ['brain', 'head', 'mri', 'neurological', 'stroke', 'headache']
+        if any(keyword in context_lower for keyword in brain_keywords):
+            return 'mri'
+        
+        # NORMAL/GENERAL INDICATORS
+        normal_keywords = ['selfie', 'portrait', 'normal', 'healthy', 'check-up', 'routine', 'no symptoms', 'general']
+        if any(keyword in context_lower for keyword in normal_keywords):
+            return 'normal'
+        
+        return None
+    
+    def _is_normal_photo(self, image) -> bool:
+        """Detect if this is a normal photo/selfie (not medical)"""
+        try:
+            # Convert to numpy array
             img_array = np.array(image)
             
-            # Priority-based detection (most common to least common)
-            # 1. Check for skin first (most common medical photos)
+            # Check if it's a color image (normal photos are usually color)
+            if len(img_array.shape) == 3 and img_array.shape[2] == 3:
+                # Check for normal lighting (not medical imaging lighting)
+                avg_brightness = np.mean(img_array)
+                
+                # Normal photos have moderate brightness (50-200)
+                if 50 < avg_brightness < 200:
+                    # Check for color variety (normal photos have varied colors)
+                    color_std = np.std(img_array)
+                    if color_std > 20:  # Good color variation
+                        return True
+            
+            return False
+            
+        except Exception:
+            return False
+    
+    def _analyze_visual_features(self, image) -> str:
+        """Analyze visual features to determine image type"""
+        try:
+            img_array = np.array(image)
+            
+            # X-RAY DETECTION (high contrast, grayscale, dark background)
+            if self._looks_like_xray(img_array):
+                return 'bone'  # Most X-rays are bone-related
+            
+            # SKIN DETECTION (flesh tones, texture patterns)
             if self._looks_like_skin(img_array):
                 return 'skin'
             
-            # 2. Check for X-ray (very specific characteristics)
-            if self._looks_like_xray(img_array):
-                return 'xray'
-                
-            # 3. Check for MRI/CT (less common)
-            if self._looks_like_mri_ct(img_array):
-                return 'mri'
+            # EYE DETECTION (circular patterns, specific colors)
+            if self._looks_like_eye(img_array):
+                return 'eyes'
             
-            # 4. Check aspect ratio and other clues
-            aspect_ratio = width / height
+            return None
             
-            # Face/skin photos are often portrait or square
-            if 0.7 <= aspect_ratio <= 1.5:
-                # Check if it has color and moderate brightness (likely skin/face)
-                if len(img_array.shape) == 3:
-                    mean_brightness = np.mean(img_array)
-                    if 50 < mean_brightness < 200:
-                        return 'skin'
-            
-            # X-rays are often landscape and have specific characteristics
-            if aspect_ratio > 1.2:
-                if len(img_array.shape) == 3:
-                    # Check if mostly grayscale
-                    color_std = np.std([np.std(img_array[:,:,0]), np.std(img_array[:,:,1]), np.std(img_array[:,:,2])])
-                    if color_std < 20:  # Low color variation
-                        return 'xray'
-            
-            # Default to skin for unclear cases (safest assumption for medical photos)
-            return 'skin'
-            
-        except Exception as e:
-            self.logger.error(f"Error detecting image type: {e}")
-            return 'skin'  # Safe default
+        except Exception:
+            return None
+    
+    def _intelligent_fallback(self, context: str) -> str:
+        """Intelligent fallback based on any available context"""
+        # If no context, assume normal photo (safest)
+        if not context or context.strip() == "":
+            return 'normal'
+        
+        # If there's any medical context, default to general medical
+        medical_indicators = ['pain', 'hurt', 'problem', 'condition', 'symptom', 'medical', 'doctor', 'hospital']
+        if any(word in context.lower() for word in medical_indicators):
+            return 'general'  # General medical examination
+        
+        # Otherwise, normal photo
+        return 'normal'
     
     def _looks_like_xray(self, img_array: np.ndarray) -> bool:
         """Detect if image looks like an X-ray"""
@@ -260,6 +331,63 @@ class MedicalImageRouter:
         except Exception:
             return False
     
+    def _looks_like_eye(self, img_array: np.ndarray) -> bool:
+        """Detect if image looks like an eye/retinal image"""
+        try:
+            # Eye images typically have:
+            # 1. Circular patterns (iris, pupil)
+            # 2. Specific color distributions (for fundus images)
+            # 3. Central dark region (pupil) with surrounding color
+            
+            if len(img_array.shape) == 3:
+                # For color images, check for typical eye colors
+                r_mean = np.mean(img_array[:, :, 0])
+                g_mean = np.mean(img_array[:, :, 1])
+                b_mean = np.mean(img_array[:, :, 2])
+                
+                # Eyes often have brown, blue, green, or hazel colors
+                # Also check for retinal image characteristics (reddish background)
+                has_eye_colors = (
+                    # Brown eyes
+                    (r_mean > 100 and g_mean > 70 and b_mean < 80) or
+                    # Blue eyes  
+                    (b_mean > 100 and r_mean < 100 and g_mean < 100) or
+                    # Green eyes
+                    (g_mean > 90 and r_mean < 120 and b_mean < 90) or
+                    # Retinal images (reddish)
+                    (r_mean > 120 and g_mean < 100 and b_mean < 80)
+                )
+                
+                gray = np.mean(img_array, axis=2)
+            else:
+                gray = img_array
+                has_eye_colors = True  # For grayscale, skip color check
+            
+            # Check for circular patterns typical in eye images
+            height, width = gray.shape
+            center_y, center_x = height // 2, width // 2
+            
+            # Sample points in concentric circles to detect circular patterns
+            center_region = gray[center_y-20:center_y+20, center_x-20:center_x+20]
+            if center_region.size > 0:
+                center_intensity = np.mean(center_region)
+                
+                # Check if there's a dark center (pupil) surrounded by lighter area
+                outer_ring = gray[center_y-50:center_y+50, center_x-50:center_x+50]
+                if outer_ring.size > 0:
+                    outer_intensity = np.mean(outer_ring)
+                    
+                    # Eye detection criteria
+                    has_dark_center = center_intensity < outer_intensity - 20
+                    has_good_contrast = np.std(gray) > 25
+                    
+                    return has_eye_colors and has_dark_center and has_good_contrast
+            
+            return False
+            
+        except Exception:
+            return False
+    
     def _looks_like_mri_ct(self, img_array: np.ndarray) -> bool:
         """Detect if image looks like MRI/CT scan"""
         try:
@@ -280,7 +408,7 @@ class MedicalImageRouter:
             return False
     
     def route_analysis(self, image_data: bytes, image_type: str = None, context: str = None, 
-                      user_city: str = None) -> Dict[str, Any]:
+                      user_city: str = None, symptoms: str = "", specialty: str = None) -> Dict[str, Any]:
         """
         Route image to appropriate analyzer
         
@@ -289,29 +417,38 @@ class MedicalImageRouter:
             image_type: Specified image type or None for auto-detection
             context: Optional context from user
             user_city: User location for doctor recommendations
+            symptoms: Patient symptoms (NEW)
+            specialty: Requested medical specialty (NEW)
             
         Returns:
             Analysis results from appropriate analyzer
         """
         try:
+            # CHECKPOINT: Combine context and symptoms for better analysis
+            enhanced_context = context or ""
+            if symptoms:
+                enhanced_context += f" Patient symptoms: {symptoms}"
+            if specialty:
+                enhanced_context += f" Requested specialty: {specialty}"
+            
             # Detect image type if not specified
             if not image_type:
-                image_type = self.detect_image_type(image_data, context)
+                image_type = self.detect_image_type(image_data, enhanced_context)
             
             self.logger.info(f"Routing {image_type} image for analysis")
             
             # Route to appropriate analyzer
             if image_type == 'skin':
-                return self._analyze_skin_image(image_data, user_city, context)
+                return self._analyze_skin_image(image_data, user_city, enhanced_context)
             elif image_type == 'xray':
-                return self._analyze_xray_image(image_data, user_city, context)
+                return self._analyze_xray_image(image_data, user_city, enhanced_context)
             elif image_type == 'eyes':
-                return self._analyze_eye_image(image_data, user_city, context)
+                return self._analyze_eye_image(image_data, user_city, enhanced_context)
             elif image_type in ['mri', 'ct']:
-                return self._analyze_scan_image(image_data, image_type, user_city, context)
+                return self._analyze_scan_image(image_data, image_type, user_city, enhanced_context)
             else:
                 # Default to skin analysis
-                return self._analyze_skin_image(image_data, user_city, context)
+                return self._analyze_skin_image(image_data, user_city, enhanced_context)
                 
         except Exception as e:
             self.logger.error(f"Error routing image analysis: {e}")
@@ -500,3 +637,20 @@ if __name__ == "__main__":
     
     result = analyze_medical_image_comprehensive(test_data, context="skin condition")
     print("Test completed:", result['success'])
+
+# CHECKPOINT: Global routing function for external imports
+def route_medical_image(image_data: bytes, image_type: str = None, context: str = None, 
+                       symptoms: str = "", specialty: str = None, user_city: str = None) -> Dict[str, Any]:
+    """
+    CHECKPOINT: Main Medical Image Routing Function
+    Purpose: Routes medical images to the most appropriate analyzer
+    This function is imported by main.py for the /api/v1/analyze-skin endpoint
+    """
+    return medical_image_router.route_analysis(
+        image_data=image_data,
+        image_type=image_type,
+        context=context,
+        symptoms=symptoms,
+        specialty=specialty,
+        user_city=user_city
+    )

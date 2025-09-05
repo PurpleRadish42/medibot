@@ -2369,6 +2369,49 @@
             }
         }
 
+        // Enhanced: Check for specialist and message pre-loading from image analysis
+        function checkSpecialistPreload() {
+            try {
+                const urlParams = new URLSearchParams(window.location.search);
+                const specialist = urlParams.get('specialist');
+                const message = urlParams.get('message');
+                
+                if (specialist || message) {
+                    console.log('🏥 Medical image analysis redirect detected');
+                    console.log('   Specialist:', specialist);
+                    console.log('   Message:', message);
+                    
+                    if (specialist) {
+                        // Show notification about specialist context
+                        const specialistName = specialist.replace('-', ' ').replace(/\b\w/g, l => l.toUpperCase());
+                        addMessage(`🏥 **Medical Image Analysis Complete**\n\nBased on your medical image analysis, I recommend consulting a **${specialistName}**. I'm here to help you find qualified doctors and prepare for your consultation.`, 'ai');
+                    }
+                    
+                    // Auto-send the message if provided
+                    if (message) {
+                        setTimeout(() => {
+                            const messageInput = document.getElementById('messageInput');
+                            if (messageInput) {
+                                messageInput.value = message;
+                                // Auto-send the message
+                                setTimeout(() => {
+                                    sendMessage();
+                                }, 500);
+                            }
+                        }, 1000);
+                    }
+                    
+                    // Clean up URL parameters
+                    setTimeout(() => {
+                        const newUrl = window.location.pathname;
+                        window.history.replaceState({}, document.title, newUrl);
+                    }, 2000);
+                }
+            } catch (error) {
+                console.error('Error checking specialist preload:', error);
+            }
+        }
+
         // Initialize application
         document.addEventListener('DOMContentLoaded', async function() {
             console.log("🚀 Initializing chat application...");
@@ -2382,6 +2425,9 @@
                 resetInProgress: false,
                 sendInProgress: false
             };
+            
+            // Check for specialist pre-loading from URL parameters
+            checkSpecialistPreload();
             
             // Check API status first
             const apiStatus = await checkAPIStatus();

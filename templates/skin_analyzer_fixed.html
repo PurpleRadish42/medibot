@@ -1,0 +1,691 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Medical Image Analyzer - MedBot AI</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            color: white;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 2rem;
+        }
+        
+        .header {
+            text-align: center;
+            margin-bottom: 2rem;
+        }
+        
+        .header h1 {
+            font-size: 2.5rem;
+            margin-bottom: 1rem;
+            background: linear-gradient(45deg, #4facfe, #00f2fe);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        
+        .header p {
+            font-size: 1.1rem;
+            opacity: 0.9;
+            margin-bottom: 1rem;
+        }
+        
+        .image-type-selector {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 15px;
+            padding: 1.5rem;
+            margin-bottom: 2rem;
+            backdrop-filter: blur(10px);
+        }
+        
+        .image-type-selector h3 {
+            margin-bottom: 1rem;
+            color: #00f2fe;
+        }
+        
+        .image-types {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1rem;
+            margin-bottom: 1rem;
+        }
+        
+        .image-type-card {
+            background: rgba(255, 255, 255, 0.1);
+            border: 2px solid transparent;
+            border-radius: 10px;
+            padding: 1rem;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-align: center;
+        }
+        
+        .image-type-card:hover,
+        .image-type-card.selected {
+            border-color: #00f2fe;
+            background: rgba(255, 255, 255, 0.2);
+            transform: translateY(-2px);
+        }
+        
+        .image-type-card i {
+            font-size: 2rem;
+            margin-bottom: 0.5rem;
+            color: #4facfe;
+        }
+        
+        .image-type-card h4 {
+            margin-bottom: 0.5rem;
+        }
+        
+        .image-type-card p {
+            font-size: 0.9rem;
+            opacity: 0.8;
+        }
+        
+        .disclaimer {
+            background: rgba(255, 165, 0, 0.1);
+            border: 1px solid rgba(255, 165, 0, 0.3);
+            border-radius: 10px;
+            padding: 1rem;
+            margin-bottom: 1rem;
+        }
+        
+        .disclaimer i {
+            color: #ffa500;
+            margin-right: 0.5rem;
+        }
+        
+        .upload-section {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 15px;
+            padding: 2rem;
+            margin-bottom: 2rem;
+            backdrop-filter: blur(10px);
+        }
+        
+        .upload-section h3 {
+            text-align: center;
+            margin-bottom: 1.5rem;
+            color: #00f2fe;
+        }
+        
+        .upload-options {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1rem;
+            margin-bottom: 2rem;
+        }
+        
+        .upload-option {
+            background: rgba(255, 255, 255, 0.1);
+            border: 2px solid transparent;
+            border-radius: 10px;
+            padding: 2rem;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        
+        .upload-option:hover,
+        .upload-option.active {
+            border-color: #4facfe;
+            background: rgba(79, 172, 254, 0.2);
+            transform: translateY(-2px);
+        }
+        
+        .upload-option i {
+            font-size: 3rem;
+            margin-bottom: 1rem;
+            color: #4facfe;
+        }
+        
+        .upload-option h4 {
+            margin-bottom: 0.5rem;
+        }
+        
+        .upload-option p {
+            opacity: 0.8;
+            font-size: 0.9rem;
+        }
+        
+        #fileInput {
+            display: none;
+        }
+        
+        .camera-section {
+            display: none;
+            text-align: center;
+            margin: 1rem 0;
+        }
+        
+        .camera-section video {
+            max-width: 100%;
+            height: auto;
+            border-radius: 10px;
+            margin-bottom: 1rem;
+        }
+        
+        .camera-controls {
+            display: flex;
+            justify-content: center;
+            gap: 1rem;
+        }
+        
+        .btn {
+            background: #4facfe;
+            color: white;
+            border: none;
+            padding: 0.75rem 1.5rem;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 1rem;
+            transition: all 0.3s ease;
+        }
+        
+        .btn:hover {
+            background: #3d8bfe;
+            transform: translateY(-1px);
+        }
+        
+        .btn-danger {
+            background: #dc3545;
+        }
+        
+        .btn-danger:hover {
+            background: #c82333;
+        }
+        
+        .btn-secondary {
+            background: #6c757d;
+        }
+        
+        .btn-secondary:hover {
+            background: #545b62;
+        }
+        
+        .preview-section {
+            display: none;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 15px;
+            padding: 2rem;
+            margin-bottom: 2rem;
+            backdrop-filter: blur(10px);
+            text-align: center;
+        }
+        
+        .preview-section h3 {
+            margin-bottom: 1rem;
+            color: #00f2fe;
+        }
+        
+        .preview-section img {
+            max-width: 100%;
+            max-height: 400px;
+            border-radius: 10px;
+            margin-bottom: 1rem;
+        }
+        
+        .symptoms-input {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 15px;
+            padding: 2rem;
+            margin-bottom: 2rem;
+            backdrop-filter: blur(10px);
+        }
+        
+        .symptoms-input h3 {
+            margin-bottom: 1rem;
+            color: #00f2fe;
+        }
+        
+        .symptoms-input textarea {
+            width: 100%;
+            min-height: 100px;
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            border-radius: 8px;
+            padding: 1rem;
+            color: white;
+            font-size: 1rem;
+            resize: vertical;
+        }
+        
+        .symptoms-input textarea::placeholder {
+            color: rgba(255, 255, 255, 0.7);
+        }
+        
+        .loading-section {
+            display: none;
+            text-align: center;
+            padding: 2rem;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 15px;
+            margin-bottom: 2rem;
+        }
+        
+        .loading-section i {
+            font-size: 3rem;
+            color: #4facfe;
+            animation: spin 1s linear infinite;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        .results-section {
+            display: none;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 15px;
+            padding: 2rem;
+            margin-bottom: 2rem;
+            backdrop-filter: blur(10px);
+        }
+        
+        .results-section h3 {
+            margin-bottom: 1.5rem;
+            color: #00f2fe;
+        }
+        
+        .analysis-result {
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 10px;
+            padding: 1rem;
+            margin-bottom: 1rem;
+        }
+        
+        .confidence-bar {
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 10px;
+            height: 8px;
+            margin-top: 0.5rem;
+            overflow: hidden;
+        }
+        
+        .confidence-fill {
+            height: 100%;
+            border-radius: 10px;
+            transition: width 0.3s ease;
+        }
+        
+        .confidence-high { background: #28a745; }
+        .confidence-medium { background: #ffc107; }
+        .confidence-low { background: #dc3545; }
+        
+        @media (max-width: 768px) {
+            .upload-options {
+                grid-template-columns: 1fr;
+            }
+            
+            .camera-controls {
+                flex-direction: column;
+                align-items: center;
+            }
+            
+            .container {
+                padding: 1rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1><i class="fas fa-user-md"></i> Medical Image Analyzer</h1>
+            <p>AI-powered medical image analysis for healthcare professionals and patients</p>
+            
+            <div class="disclaimer">
+                <i class="fas fa-exclamation-triangle"></i>
+                <strong>Important:</strong> This tool is for educational and informational purposes only. 
+                Always consult with qualified healthcare professionals for medical diagnosis and treatment.
+            </div>
+        </div>
+
+        <!-- Image Type Selector -->
+        <div class="image-type-selector">
+            <h3><i class="fas fa-images"></i> Select Image Type</h3>
+            <div class="image-types">
+                <div class="image-type-card" data-type="skin" onclick="selectImageType('skin')">
+                    <i class="fas fa-hand-paper"></i>
+                    <h4>Skin/Dermatology</h4>
+                    <p>Analyze skin conditions, rashes, moles, lesions</p>
+                </div>
+                <div class="image-type-card" data-type="xray" onclick="selectImageType('xray')">
+                    <i class="fas fa-x-ray"></i>
+                    <h4>X-Ray</h4>
+                    <p>Chest X-rays, bone fractures, joint analysis</p>
+                </div>
+                <div class="image-type-card" data-type="eye" onclick="selectImageType('eye')">
+                    <i class="fas fa-eye"></i>
+                    <h4>Retinal/Eye</h4>
+                    <p>Retinal scans, diabetic retinopathy detection</p>
+                </div>
+                <div class="image-type-card" data-type="mri" onclick="selectImageType('mri')">
+                    <i class="fas fa-brain"></i>
+                    <h4>MRI/CT Scan</h4>
+                    <p>Brain scans, organ imaging, tumor detection</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Upload Section -->
+        <div class="upload-section">
+            <h3><i class="fas fa-upload"></i> Upload or Capture Image</h3>
+            
+            <div class="upload-options">
+                <div class="upload-option" id="uploadOption" onclick="selectUploadOption()">
+                    <i class="fas fa-cloud-upload-alt"></i>
+                    <h4>Upload Image</h4>
+                    <p>Select from your device</p>
+                </div>
+                <div class="upload-option" id="cameraOption" onclick="selectCameraOption()">
+                    <i class="fas fa-camera"></i>
+                    <h4>Take Photo</h4>
+                    <p>Use your camera</p>
+                </div>
+            </div>
+            
+            <input type="file" id="fileInput" accept="image/*" onchange="handleFileSelect(event)">
+            
+            <div class="camera-section" id="cameraSection">
+                <video id="videoElement" autoplay playsinline></video>
+                <div class="camera-controls">
+                    <button class="btn" onclick="capturePhoto()">
+                        <i class="fas fa-camera"></i> Capture
+                    </button>
+                    <button class="btn btn-danger" onclick="stopCamera()">
+                        <i class="fas fa-times"></i> Cancel
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Preview Section -->
+        <div class="preview-section" id="previewSection">
+            <h3><i class="fas fa-image"></i> Image Preview</h3>
+            <img id="imagePreview" src="" alt="Preview">
+            <div>
+                <button class="btn" onclick="analyzeImage()">
+                    <i class="fas fa-search"></i> Analyze Image
+                </button>
+                <button class="btn btn-secondary" onclick="removeImage()">
+                    <i class="fas fa-trash"></i> Remove
+                </button>
+            </div>
+        </div>
+
+        <!-- Symptoms Input -->
+        <div class="symptoms-input">
+            <h3><i class="fas fa-clipboard-list"></i> Additional Symptoms (Optional)</h3>
+            <textarea id="symptomsText" placeholder="Describe any symptoms, duration, pain level, or additional context that might help with the analysis..."></textarea>
+        </div>
+
+        <!-- Loading Section -->
+        <div class="loading-section" id="loadingSection">
+            <i class="fas fa-spinner"></i>
+            <h3>Analyzing Image...</h3>
+            <p>Our AI is processing your image. This may take a few moments.</p>
+        </div>
+
+        <!-- Results Section -->
+        <div class="results-section" id="resultsSection">
+            <h3><i class="fas fa-chart-bar"></i> Analysis Results</h3>
+            <div id="analysisResults"></div>
+        </div>
+    </div>
+
+    <script>
+        let currentStream = null;
+        let selectedImage = null;
+        let selectedImageType = 'skin'; // Default
+
+        function selectImageType(type) {
+            selectedImageType = type;
+            // Remove previous selections
+            document.querySelectorAll('.image-type-card').forEach(card => {
+                card.classList.remove('selected');
+            });
+            // Add selection to clicked card
+            document.querySelector(`[data-type="${type}"]`).classList.add('selected');
+        }
+
+        function selectUploadOption() {
+            console.log('Upload option clicked');
+            document.getElementById('uploadOption').classList.add('active');
+            document.getElementById('cameraOption').classList.remove('active');
+            document.getElementById('cameraSection').style.display = 'none';
+            stopCamera();
+            // Trigger file input
+            document.getElementById('fileInput').click();
+        }
+
+        function selectCameraOption() {
+            console.log('Camera option clicked');
+            document.getElementById('cameraOption').classList.add('active');
+            document.getElementById('uploadOption').classList.remove('active');
+            startCamera();
+        }
+
+        async function startCamera() {
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ 
+                    video: { 
+                        facingMode: 'environment',
+                        width: { ideal: 1280 },
+                        height: { ideal: 720 }
+                    } 
+                });
+                currentStream = stream;
+                document.getElementById('videoElement').srcObject = stream;
+                document.getElementById('cameraSection').style.display = 'block';
+            } catch (error) {
+                console.error('Error accessing camera:', error);
+                alert('Unable to access camera. Please check permissions or use the upload option instead.');
+                document.getElementById('cameraOption').classList.remove('active');
+            }
+        }
+
+        function stopCamera() {
+            if (currentStream) {
+                currentStream.getTracks().forEach(track => track.stop());
+                currentStream = null;
+            }
+            document.getElementById('cameraSection').style.display = 'none';
+            document.getElementById('cameraOption').classList.remove('active');
+        }
+
+        function capturePhoto() {
+            const video = document.getElementById('videoElement');
+            const canvas = document.createElement('canvas');
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+            
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(video, 0, 0);
+            
+            canvas.toBlob((blob) => {
+                selectedImage = new File([blob], 'camera-capture.jpg', { type: 'image/jpeg' });
+                displayPreview(canvas.toDataURL('image/jpeg', 0.8));
+                stopCamera();
+            }, 'image/jpeg', 0.8);
+        }
+
+        function handleFileSelect(event) {
+            console.log('File select triggered', event.target.files);
+            const file = event.target.files[0];
+            if (file) {
+                if (file.size > 10 * 1024 * 1024) { // 10MB limit
+                    alert('File size too large. Please select an image under 10MB.');
+                    return;
+                }
+                
+                selectedImage = file;
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    displayPreview(e.target.result);
+                };
+                reader.readAsDataURL(file);
+            }
+        }
+
+        function displayPreview(imageSrc) {
+            document.getElementById('imagePreview').src = imageSrc;
+            document.getElementById('previewSection').style.display = 'block';
+            document.getElementById('resultsSection').style.display = 'none';
+        }
+
+        function removeImage() {
+            selectedImage = null;
+            document.getElementById('previewSection').style.display = 'none';
+            document.getElementById('resultsSection').style.display = 'none';
+            document.getElementById('uploadOption').classList.remove('active');
+            document.getElementById('cameraOption').classList.remove('active');
+            document.getElementById('fileInput').value = '';
+            stopCamera();
+        }
+
+        async function analyzeImage() {
+            if (!selectedImage) {
+                alert('Please select an image first.');
+                return;
+            }
+
+            // Show loading
+            document.getElementById('loadingSection').style.display = 'block';
+            document.getElementById('resultsSection').style.display = 'none';
+
+            try {
+                const formData = new FormData();
+                formData.append('image', selectedImage);
+                formData.append('image_type', selectedImageType);
+                formData.append('symptoms', document.getElementById('symptomsText').value || 'User uploaded image for analysis');
+
+                const response = await fetch('/api/v1/analyze-skin', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const result = await response.json();
+                
+                // Hide loading
+                document.getElementById('loadingSection').style.display = 'none';
+                
+                if (result.success) {
+                    displayResults(result);
+                } else {
+                    displayError(result.message || 'Analysis failed');
+                }
+            } catch (error) {
+                console.error('Analysis error:', error);
+                document.getElementById('loadingSection').style.display = 'none';
+                displayError('Network error: Could not connect to analysis service.');
+            }
+        }
+
+        function displayResults(result) {
+            const analysis = result.analysis;
+            let html = '';
+
+            // Analysis summary
+            if (analysis.summary) {
+                html += `
+                    <div class="analysis-result">
+                        <h4><i class="fas fa-info-circle"></i> Analysis Summary</h4>
+                        <p>${analysis.summary}</p>
+                    </div>
+                `;
+            }
+
+            // Detected conditions
+            if (analysis.conditions && analysis.conditions.length > 0) {
+                html += `<div class="analysis-result">
+                    <h4><i class="fas fa-stethoscope"></i> Detected Conditions</h4>`;
+                
+                analysis.conditions.forEach((condition, index) => {
+                    const confidenceClass = condition.confidence > 70 ? 'confidence-high' : 
+                                          condition.confidence > 50 ? 'confidence-medium' : 'confidence-low';
+                    
+                    html += `
+                        <div style="margin: 1rem 0; padding: 1rem; background: rgba(255,255,255,0.05); border-radius: 8px;">
+                            <div style="display: flex; justify-content: space-between; align-items: center;">
+                                <strong>${condition.name}</strong>
+                                <span>${Math.round(condition.confidence)}%</span>
+                            </div>
+                            <div class="confidence-bar">
+                                <div class="confidence-fill ${confidenceClass}" style="width: ${condition.confidence}%"></div>
+                            </div>
+                            ${condition.source ? `<small style="opacity: 0.7;">Source: ${condition.source}</small>` : ''}
+                        </div>
+                    `;
+                });
+                html += '</div>';
+            }
+
+            // Recommendations
+            if (analysis.recommendations && analysis.recommendations.length > 0) {
+                html += `
+                    <div class="analysis-result">
+                        <h4><i class="fas fa-clipboard-list"></i> Recommendations</h4>
+                        <ul style="margin-left: 1.5rem;">
+                `;
+                analysis.recommendations.forEach(rec => {
+                    html += `<li style="margin: 0.5rem 0;">${rec}</li>`;
+                });
+                html += '</ul></div>';
+            }
+
+            // Analysis methods
+            if (analysis.analysis_methods && analysis.analysis_methods.length > 0) {
+                html += `
+                    <div style="margin-top: 1rem; padding: 1rem; background: rgba(255,255,255,0.05); border-radius: 8px; font-size: 0.9rem;">
+                        <div><i class="fas fa-cogs"></i> Analysis methods: ${analysis.analysis_methods.join(', ')}</div>
+                        <div><i class="fas fa-percentage"></i> Overall confidence: ${Math.round(analysis.overall_confidence || 0)}%</div>
+                    </div>
+                `;
+            }
+
+            document.getElementById('analysisResults').innerHTML = html;
+            document.getElementById('resultsSection').style.display = 'block';
+        }
+
+        function displayError(message) {
+            document.getElementById('analysisResults').innerHTML = `
+                <div class="analysis-result" style="border-left: 4px solid #dc3545;">
+                    <h4 style="color: #dc3545;"><i class="fas fa-exclamation-triangle"></i> Error</h4>
+                    <p>${message}</p>
+                </div>
+            `;
+            document.getElementById('resultsSection').style.display = 'block';
+        }
+
+        // Initialize page
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('Page loaded, initializing...');
+            selectImageType('skin'); // Select default image type
+            
+            // Test file input
+            const fileInput = document.getElementById('fileInput');
+            console.log('File input element:', fileInput);
+            
+            // Add click event listener as backup
+            fileInput.addEventListener('change', handleFileSelect);
+        });
+    </script>
+</body>
+</html>
