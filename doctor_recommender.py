@@ -312,19 +312,46 @@ class DoctorRecommender:
             
             # Handle location-based sorting with coordinates
             if sort_by == "location" and user_lat is not None and user_lng is not None:
-                # Calculate distance for each doctor using coordinates
-                filtered_doctors['distance_km'] = filtered_doctors.apply(
-                    lambda row: self.calculate_distance(
-                        user_lat, user_lng, 
-                        float(row['latitude']) if pd.notna(row['latitude']) else 0,
-                        float(row['longitude']) if pd.notna(row['longitude']) else 0
-                    ), axis=1
+                # Filter out doctors with invalid coordinates first
+                valid_coords = (
+                    pd.notna(filtered_doctors['latitude']) & 
+                    pd.notna(filtered_doctors['longitude']) &
+                    (filtered_doctors['latitude'] != 0) &
+                    (filtered_doctors['longitude'] != 0)
                 )
-                # Sort by distance first, then by rating
-                filtered_doctors = filtered_doctors.sort_values([
-                    'distance_km', 'dp_score', 'year_of_experience'
-                ], ascending=[True, False, False])
-                print(f"📍 Sorted by distance from user location ({user_lat:.4f}, {user_lng:.4f})")
+                
+                doctors_with_coords = filtered_doctors[valid_coords].copy()
+                doctors_without_coords = filtered_doctors[~valid_coords].copy()
+                
+                if not doctors_with_coords.empty:
+                    # Calculate distance for doctors with valid coordinates
+                    doctors_with_coords['distance_km'] = doctors_with_coords.apply(
+                        lambda row: self.calculate_distance(
+                            user_lat, user_lng, 
+                            float(row['latitude']), 
+                            float(row['longitude'])
+                        ), axis=1
+                    )
+                    
+                    # Sort by distance first, then by rating
+                    doctors_with_coords = doctors_with_coords.sort_values([
+                        'distance_km', 'dp_score', 'year_of_experience'
+                    ], ascending=[True, False, False])
+                    
+                    # Set high distance for doctors without coordinates so they appear last
+                    doctors_without_coords['distance_km'] = 999999
+                    
+                    # Combine: doctors with coordinates first (sorted by distance), then others
+                    filtered_doctors = pd.concat([doctors_with_coords, doctors_without_coords], ignore_index=True)
+                    
+                    print(f"📍 Sorted by distance from user location ({user_lat:.4f}, {user_lng:.4f})")
+                    print(f"📊 {len(doctors_with_coords)} doctors with coordinates, {len(doctors_without_coords)} without")
+                else:
+                    # No doctors with valid coordinates, fall back to rating sort
+                    filtered_doctors = filtered_doctors.sort_values([
+                        'dp_score', 'year_of_experience'
+                    ], ascending=[False, False])
+                    print(f"⚠️ No doctors with valid coordinates, sorting by rating instead")
             elif sort_by == "experience":
                 # Sort by experience first, then rating, then fee
                 filtered_doctors = filtered_doctors.sort_values([
