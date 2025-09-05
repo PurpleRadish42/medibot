@@ -283,6 +283,27 @@ class MedicalRecommender:
                     
                     return response_prefix + doctor_recommendations
             
+            # NEW: Check if user is asking for doctors after a recommendation was made
+            if conversation_state["recommendation_made"] and conversation_state["last_specialist"]:
+                doctor_request_keywords = [
+                    "list", "show", "doctors", "find", "recommend", "where", 
+                    "which doctor", "doctor list", conversation_state["last_specialist"].lower()
+                ]
+                
+                if any(keyword in message.lower() for keyword in doctor_request_keywords):
+                    # User is asking for doctor recommendations, provide them automatically
+                    specialist_type = conversation_state["last_specialist"]
+                    
+                    doctor_recommendations = self.get_doctor_recommendations(
+                        specialist_type, 
+                        user_city, 
+                        sort_by=sort_preference,
+                        user_location=user_location
+                    )
+                    
+                    response_prefix = f"Here are qualified {specialist_type}s in your area:\n\n"
+                    return response_prefix + doctor_recommendations
+            
             # Check if this is a medical query
             if not self.is_medical_query(message) and len(history) > 0:
                 return "I'm a medical triage assistant. I can only help you determine which medical specialist you should visit based on your symptoms. Please describe any health concerns or symptoms you're experiencing."
@@ -325,8 +346,8 @@ class MedicalRecommender:
             # Check if this response contains a specialist recommendation
             specialist_type = self.extract_specialist_recommendation(ai_response)
             
-            # If this is a new recommendation (not already in history)
-            if specialist_type and not conversation_state["recommendation_made"]:
+            # If this response contains a specialist recommendation
+            if specialist_type:
                 # Remove the specialist recommendation line from response
                 ai_response = re.sub(r"SPECIALIST_RECOMMENDATION:.*", "", ai_response, flags=re.IGNORECASE).strip()
                 

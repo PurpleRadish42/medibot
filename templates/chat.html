@@ -1220,8 +1220,94 @@
         function handleSortChange() {
             const sortDropdown = document.getElementById('sortPreference');
             window.ChatState.doctorSortPreference = sortDropdown.value;
-            showStatus(`Sort preference updated: ${sortDropdown.options[sortDropdown.selectedIndex].text}`, 'success');
+            const sortText = sortDropdown.options[sortDropdown.selectedIndex].text;
+            
+            showStatus(`Sort preference updated: ${sortText}`, 'success');
             console.log('🔄 Sort preference changed to:', window.ChatState.doctorSortPreference);
+            
+            // If there's a recent doctor recommendation, refresh it with new sorting
+            refreshLastDoctorRecommendation();
+        }
+
+        // Function to refresh the last doctor recommendation with new sorting
+        function refreshLastDoctorRecommendation() {
+            // Find the last bot message that contains a doctor table
+            const botMessages = document.querySelectorAll('.message.bot');
+            for (let i = botMessages.length - 1; i >= 0; i--) {
+                const messageContent = botMessages[i].querySelector('.message-content');
+                if (messageContent && hasDoctorRecommendations(messageContent.innerHTML)) {
+                    // Extract the specialty from the table (look for common patterns)
+                    const content = messageContent.innerHTML.toLowerCase();
+                    let specialty = null;
+                    
+                    if (content.includes('cardiologist')) specialty = 'cardiologist';
+                    else if (content.includes('dermatologist')) specialty = 'dermatologist';
+                    else if (content.includes('neurologist')) specialty = 'neurologist';
+                    else if (content.includes('orthopedist')) specialty = 'orthopedist';
+                    else if (content.includes('gynecologist')) specialty = 'gynecologist';
+                    else if (content.includes('pediatrician')) specialty = 'pediatrician';
+                    else if (content.includes('general-physician')) specialty = 'general-physician';
+                    else if (content.includes('dentist')) specialty = 'dentist';
+                    else if (content.includes('ophthalmologist')) specialty = 'ophthalmologist';
+                    else if (content.includes('psychiatrist')) specialty = 'psychiatrist';
+                    
+                    if (specialty) {
+                        console.log(`🔄 Refreshing ${specialty} recommendations with ${window.ChatState.doctorSortPreference} sorting`);
+                        requestUpdatedDoctorRecommendations(specialty, messageContent);
+                        return;
+                    }
+                    break;
+                }
+            }
+        }
+
+        // Function to request updated doctor recommendations
+        async function requestUpdatedDoctorRecommendations(specialty, messageElement) {
+            try {
+                showStatus('Updating recommendations...', 'info');
+                
+                const requestBody = {
+                    message: `Show me ${specialty} recommendations sorted by ${window.ChatState.doctorSortPreference}`,
+                    chatId: window.ChatState.currentChatId,
+                    sortPreference: window.ChatState.doctorSortPreference
+                };
+                
+                // Include location if available
+                if (window.ChatState.userLocation) {
+                    requestBody.userLocation = window.ChatState.userLocation;
+                }
+                
+                const response = await fetch('/api/chat', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(requestBody)
+                });
+
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}`);
+                }
+
+                const data = await response.json();
+                
+                // Update the message content with new sorted recommendations
+                if (data.response) {
+                    messageElement.innerHTML = data.response;
+                    
+                    // Re-add email button if it was there
+                    if (hasDoctorRecommendations(data.response)) {
+                        const emailButton = createEmailButton(data.response);
+                        messageElement.appendChild(emailButton);
+                    }
+                    
+                    showStatus('Recommendations updated successfully!', 'success');
+                }
+                
+            } catch (error) {
+                console.error('❌ Error updating recommendations:', error);
+                showStatus('Failed to update recommendations', 'error');
+            }
         }
 
         // Helper function to detect if content contains doctor recommendations
