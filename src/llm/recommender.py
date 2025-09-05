@@ -169,18 +169,27 @@ class MedicalRecommender:
         else:
             return "unknown"
 
-    def get_doctor_recommendations(self, specialist_type: str, user_city: str = None, sort_by: str = "rating") -> str:
+    def get_doctor_recommendations(self, specialist_type: str, user_city: str = None, sort_by: str = "rating", user_location: dict = None) -> str:
         """Get doctor recommendations from CSV database with sorting preference"""
         if not self.doctor_recommender:
             return f"Please schedule an appointment with a {specialist_type} for proper evaluation and treatment."
         
         try:
+            # Prepare parameters for doctor recommendation
+            user_lat = None
+            user_lng = None
+            if user_location:
+                user_lat = user_location.get('latitude')
+                user_lng = user_location.get('longitude')
+            
             # Get doctor recommendations
             doctors = self.doctor_recommender.recommend_doctors(
                 specialist_type=specialist_type,
                 city=user_city,
                 limit=5,
-                sort_by=sort_by
+                sort_by=sort_by,
+                user_lat=user_lat,
+                user_lng=user_lng
             )
             
             # Format the recommendations
@@ -230,7 +239,7 @@ class MedicalRecommender:
         
         return state
     
-    def generate_response(self, history: List[Tuple[str, str]], message: str, user_city: str = None) -> str:
+    def generate_response(self, history: List[Tuple[str, str]], message: str, user_city: str = None, sort_preference: str = "rating", user_location: dict = None) -> str:
         """Generate a response using OpenAI API with interactive doctor recommendations"""
         try:
             # Analyze current conversation state from history
@@ -256,14 +265,20 @@ class MedicalRecommender:
                     if preference == "unknown":
                         return "I didn't quite understand your preference. Would you like doctors sorted by **location** (nearest to you) or by **ratings** (highest rated)? Please let me know!"
                     
-                    # Get and return doctor recommendations based on preference
+                    # Get and return doctor recommendations based on user preferences
                     doctor_recommendations = self.get_doctor_recommendations(
                         specialist_type, 
-                        user_city if preference == "location" else None, 
-                        sort_by=preference
+                        user_city, 
+                        sort_by=sort_preference,
+                        user_location=user_location
                     )
                     
-                    sort_description = "nearest to your location" if preference == "location" else "highest ratings and experience"
+                    sort_descriptions = {
+                        "location": "nearest to your location",
+                        "rating": "highest ratings and experience", 
+                        "experience": "most experienced doctors"
+                    }
+                    sort_description = sort_descriptions.get(sort_preference, "best available")
                     response_prefix = f"Here are the top {specialist_type}s sorted by {sort_description}:\n\n"
                     
                     return response_prefix + doctor_recommendations
@@ -281,29 +296,12 @@ class MedicalRecommender:
                     "role": "system", 
                     "content": "Greet the patient warmly and ask ONE question about their primary health concern. Keep it conversational and caring."
                 })
-            elif conversation_state["message_count"] < 5 and not conversation_state["recommendation_made"]:
-                # Vary the type of questions based on message count
-                if conversation_state["message_count"] == 1:
-                    messages.append({
-                        "role": "system", 
-                        "content": "Ask about the duration of their symptoms - when did it start and how long has it been going on? Be conversational and caring."
-                    })
-                elif conversation_state["message_count"] == 2:
-                    messages.append({
-                        "role": "system", 
-                        "content": "Ask about the severity and frequency - how bad is it on a scale of 1-10, and how often does it occur? Be empathetic and understanding."
-                    })
-                elif conversation_state["message_count"] == 3:
-                    messages.append({
-                        "role": "system", 
-                        "content": "Ask about any associated symptoms - are there any other symptoms that accompany the main problem? Be thorough but not overwhelming."
-                    })
-                elif conversation_state["message_count"] == 4:
-                    messages.append({
-                        "role": "system", 
-                        "content": "Ask about the impact on daily activities or any relevant medical history that might be related. Be caring and professional."
-                    })
-            elif conversation_state["message_count"] >= 5 and not conversation_state["recommendation_made"]:
+            elif conversation_state["message_count"] < 3 and not conversation_state["recommendation_made"]:
+                messages.append({
+                    "role": "system", 
+                    "content": "Based on what the patient just told you, ask ONE relevant follow-up question to better understand their symptoms. Focus on duration, severity, associated symptoms, or impact on daily life. Be conversational and empathetic."
+                })
+            elif conversation_state["message_count"] >= 3 and not conversation_state["recommendation_made"]:
                 messages.append({
                     "role": "system", 
                     "content": "You have gathered enough information. Now provide a clear recommendation for which ONE specialist the patient should see based on their symptoms. End your response with: 'SPECIALIST_RECOMMENDATION: [SPECIALIST_TYPE]'"
@@ -332,12 +330,13 @@ class MedicalRecommender:
                 # Remove the specialist recommendation line from response
                 ai_response = re.sub(r"SPECIALIST_RECOMMENDATION:.*", "", ai_response, flags=re.IGNORECASE).strip()
                 
-                # Automatically show doctor recommendations
+                # Automatically show doctor recommendations with user preferences
                 try:
                     doctor_recommendations = self.get_doctor_recommendations(
                         specialist_type, 
                         user_city, 
-                        sort_by="ratings"
+                        sort_by=sort_preference,
+                        user_location=user_location
                     )
                     
                     final_response = ai_response + "\n\n" + doctor_recommendations

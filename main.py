@@ -91,7 +91,7 @@ def login_required(f):
     return decorated_function
 
 # Fallback medical response function
-def fallback_medical_response(message):
+def fallback_medical_response(message, sort_preference="rating", user_location=None):
     """Fallback response when medical AI is not available - WITH DOCTOR RECOMMENDATIONS"""
     
     # Try to provide doctor recommendations even without OpenAI
@@ -131,8 +131,22 @@ def fallback_medical_response(message):
                 break
         
         if recommended_specialist:
-            # Get doctor recommendations
-            doctors = dr.recommend_doctors(recommended_specialist, "Bangalore", limit=3)
+            # Prepare location parameters
+            user_lat = None
+            user_lng = None
+            if user_location:
+                user_lat = user_location.get('latitude')
+                user_lng = user_location.get('longitude')
+                
+            # Get doctor recommendations with enhanced parameters
+            doctors = dr.recommend_doctors(
+                recommended_specialist, 
+                "Bangalore", 
+                limit=3, 
+                sort_by=sort_preference,
+                user_lat=user_lat,
+                user_lng=user_lng
+            )
             if doctors:
                 # Format as HTML with table
                 specialist_name = recommended_specialist.replace("_", " ").title()
@@ -142,7 +156,20 @@ def fallback_medical_response(message):
                 return response
         
         # No specialist match found
-        doctors = dr.recommend_doctors("general physician", "Bangalore", limit=2)
+        user_lat = None
+        user_lng = None
+        if user_location:
+            user_lat = user_location.get('latitude')
+            user_lng = user_location.get('longitude')
+            
+        doctors = dr.recommend_doctors(
+            "general physician", 
+            "Bangalore", 
+            limit=2, 
+            sort_by=sort_preference,
+            user_lat=user_lat,
+            user_lng=user_lng
+        )
         if doctors:
             response = "<p>I can help you find medical care for your condition.</p>\n"
             response += "<p>For your symptoms, I recommend starting with a <strong>General Physician</strong> who can evaluate your condition and refer you to a specialist if needed.</p>\n"
@@ -401,11 +428,13 @@ def chat_page():
 @app.route('/api/chat', methods=['POST'])
 @login_required
 def api_chat():
-    """API endpoint for custom chat interface - WITH DOCTOR RECOMMENDATIONS"""
+    """API endpoint for custom chat interface - WITH ENHANCED DOCTOR RECOMMENDATIONS"""
     try:
         data = request.get_json()
         message = data.get('message', '').strip()
         user_city = data.get('city', None)  # Optional: get user's city for better recommendations
+        sort_preference = data.get('sortPreference', 'rating')  # New: sorting preference
+        user_location = data.get('userLocation', None)  # New: user's GPS location
         
         if not message:
             return jsonify({'error': 'No message provided'}), 400
@@ -413,6 +442,8 @@ def api_chat():
         user_id = request.user['id']
         
         print(f"💬 Chat request from user {user_id}: {message[:50]}...")
+        print(f"📍 User location: {user_location}")
+        print(f"🔄 Sort preference: {sort_preference}")
         
         # Initialize conversation history for this user if not exists
         if user_id not in user_conversations:
@@ -427,11 +458,13 @@ def api_chat():
             try:
                 print(f"🤖 Using MedicalRecommender with {len(conversation_history)} previous messages")
                 
-                # Get AI response from MedicalRecommender
+                # Get AI response from MedicalRecommender with enhanced parameters
                 response = medical_recommender.generate_response(
                     conversation_history, 
                     message, 
-                    user_city=user_city or "Bangalore"
+                    user_city=user_city or "Bangalore",
+                    sort_preference=sort_preference,
+                    user_location=user_location
                 )
                 
                 print(f"✅ Got AI response: {response[:100]}...")
@@ -449,11 +482,11 @@ def api_chat():
                 import traceback
                 traceback.print_exc()
                 print("🔄 Falling back to doctor recommendations system")
-                response = fallback_medical_response(message)
+                response = fallback_medical_response(message, sort_preference, user_location)
                 user_conversations[user_id].append((message, response))
         else:
             print("⚠ MedicalRecommender not available, using fallback system")
-            response = fallback_medical_response(message)
+            response = fallback_medical_response(message, sort_preference, user_location)
             user_conversations[user_id].append((message, response))
         
         print(f"✅ Generated response: {response[:100]}...")
