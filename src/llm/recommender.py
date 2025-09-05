@@ -281,12 +281,29 @@ class MedicalRecommender:
                     "role": "system", 
                     "content": "Greet the patient warmly and ask ONE question about their primary health concern. Keep it conversational and caring."
                 })
-            elif conversation_state["message_count"] < 3 and not conversation_state["recommendation_made"]:
-                messages.append({
-                    "role": "system", 
-                    "content": "Based on what the patient just told you, ask ONE relevant follow-up question to better understand their symptoms. Focus on duration, severity, associated symptoms, or impact on daily life. Be conversational and empathetic."
-                })
-            elif conversation_state["message_count"] >= 3 and not conversation_state["recommendation_made"]:
+            elif conversation_state["message_count"] < 5 and not conversation_state["recommendation_made"]:
+                # Vary the type of questions based on message count
+                if conversation_state["message_count"] == 1:
+                    messages.append({
+                        "role": "system", 
+                        "content": "Ask about the duration of their symptoms - when did it start and how long has it been going on? Be conversational and caring."
+                    })
+                elif conversation_state["message_count"] == 2:
+                    messages.append({
+                        "role": "system", 
+                        "content": "Ask about the severity and frequency - how bad is it on a scale of 1-10, and how often does it occur? Be empathetic and understanding."
+                    })
+                elif conversation_state["message_count"] == 3:
+                    messages.append({
+                        "role": "system", 
+                        "content": "Ask about any associated symptoms - are there any other symptoms that accompany the main problem? Be thorough but not overwhelming."
+                    })
+                elif conversation_state["message_count"] == 4:
+                    messages.append({
+                        "role": "system", 
+                        "content": "Ask about the impact on daily activities or any relevant medical history that might be related. Be caring and professional."
+                    })
+            elif conversation_state["message_count"] >= 5 and not conversation_state["recommendation_made"]:
                 messages.append({
                     "role": "system", 
                     "content": "You have gathered enough information. Now provide a clear recommendation for which ONE specialist the patient should see based on their symptoms. End your response with: 'SPECIALIST_RECOMMENDATION: [SPECIALIST_TYPE]'"
