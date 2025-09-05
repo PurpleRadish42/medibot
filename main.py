@@ -28,6 +28,7 @@ import gradio as gr
 # Import authentication database and MongoDB chat history
 from medibot2_auth import MedibotAuthDatabase
 from mongodb_chat import MongoDBChatHistory
+from otp_service import OTPService
 
 # Import your medical recommender directly with doctor integration
 medical_recommender = None
@@ -64,6 +65,7 @@ app.secret_key = os.getenv('SECRET_KEY', 'your-secret-key-change-this-in-product
 # Initialize authentication database (MySQL) and chat history (MongoDB)
 auth_db = MedibotAuthDatabase()
 chat_history_db = MongoDBChatHistory()
+otp_service = OTPService()
 
 # Store conversation histories for each user
 user_conversations = {}
@@ -312,6 +314,31 @@ def register():
         return redirect(url_for('dashboard'))
     return render_template('register.html')
 
+@app.route('/verify-otp')
+def verify_otp():
+    """OTP verification page"""
+    email = request.args.get('email', '')
+    if not email:
+        return redirect(url_for('register'))
+    return render_template('verify_otp.html', email=email)
+
+@app.route('/forgot-password')
+def forgot_password():
+    """Forgot password page"""
+    # If already logged in, redirect to dashboard
+    session_token = request.cookies.get('session_token')
+    if session_token and auth_db.verify_session(session_token):
+        return redirect(url_for('dashboard'))
+    return render_template('forgot_password.html')
+
+@app.route('/reset-password')
+def reset_password():
+    """Reset password page"""
+    email = request.args.get('email', '')
+    if not email:
+        return redirect(url_for('forgot_password'))
+    return render_template('reset_password.html', email=email)
+
 @app.route('/api/register', methods=['POST'])
 def api_register():
     """Handle user registration"""
@@ -331,25 +358,255 @@ def api_register():
                 'message': 'All fields are required'
             }), 400
         
-        # Register user
-        success, message = auth_db.register_user(username, email, password, full_name)
-        
-        if success:
-            return jsonify({
-                'success': True,
-                'message': message
-            })
-        else:
+        # Check if user already exists
+        conn = auth_db.get_connection()
+        cursor = conn.cursor()
+        cursor.execute("SELECT id FROM users WHERE username = %s OR email = %s", (username, email))
+        if cursor.fetchone():
+            conn.close()
             return jsonify({
                 'success': False,
-                'message': message
+                'message': 'Username or email already exists'
             }), 400
+        conn.close()
+        
+        # Generate and send OTP
+        otp = otp_service.generate_otp()
+        print(f"🔑 Generated OTP: {otp} for email: {email}")
+        
+        otp_stored = otp_service.store_otp(email, otp, "registration")
+        
+        if not otp_stored:
+            print(f"❌ Failed to store OTP for {email}")
+            return jsonify({
+                'success': False,
+                'message': 'Failed to generate verification code. Please try again.'
+            }), 500
+        
+        # Send OTP email
+        print(f"📧 Sending OTP email to {email}")
+        email_sent = otp_service.send_otp_email(email, otp, "registration")
+        
+        if not email_sent:
+            return jsonify({
+                'success': False,
+                'message': 'Failed to send verification email. Please check your email address and try again.'
+            }), 500
+        
+        # Store user data temporarily for OTP verification
+        # In production, use Redis or database for temporary storage
+        if not hasattr(app, 'temp_registrations'):
+            app.temp_registrations = {}
+        
+        app.temp_registrations[email] = {
+            'full_name': full_name,
+            'username': username,
+            'password': password,
+            'created_at': time.time()
+        }
+        
+        return jsonify({
+            'success': True,
+            'message': 'Verification code sent to your email. Please check your inbox.',
+            'requires_verification': True
+        })
             
     except Exception as e:
         print(f"Registration error: {e}")
         return jsonify({
             'success': False,
             'message': 'Internal server error'
+        }), 500
+
+@app.route('/api/verify-otp', methods=['POST'])
+def api_verify_otp():
+    """Handle OTP verification for registration"""
+    try:
+        data = request.get_json()
+        email = data.get('email', '').strip()
+        otp = data.get('otp', '').strip()
+        
+        print(f"🔍 OTP verification request - Email: {email}, OTP: {otp}")
+        
+        if not email or not otp:
+            print(f"❌ Missing email or OTP - Email: {email}, OTP: {otp}")
+            return jsonify({
+                'success': False,
+                'message': 'Email and OTP are required'
+            }), 400
+        
+        # Verify OTP
+        print(f"🔍 Calling otp_service.verify_otp for {email}")
+        verification_result = otp_service.verify_otp(email, otp)
+        print(f"🔍 Verification result: {verification_result}")
+        
+        if not verification_result['success']:
+            return jsonify({
+                'success': False,
+                'message': verification_result['message'],
+                'remaining_attempts': verification_result.get('remaining_attempts', 0)
+            }), 400
+        
+        # Check if this is for registration
+        if verification_result.get('purpose') == 'registration':
+            # Get temporary registration data
+            if not hasattr(app, 'temp_registrations') or email not in app.temp_registrations:
+                return jsonify({
+                    'success': False,
+                    'message': 'Registration data not found. Please start registration again.'
+                }), 400
+            
+            temp_data = app.temp_registrations[email]
+            
+            # Check if data is not too old (1 hour)
+            if time.time() - temp_data['created_at'] > 3600:
+                del app.temp_registrations[email]
+                return jsonify({
+                    'success': False,
+                    'message': 'Registration session expired. Please start registration again.'
+                }), 400
+            
+            # Register user with email verified
+            success, message = auth_db.register_user(
+                temp_data['username'], 
+                email, 
+                temp_data['password'], 
+                temp_data['full_name'], 
+                email_verified=True
+            )
+            
+            if success:
+                # Clean up temporary data
+                del app.temp_registrations[email]
+                return jsonify({
+                    'success': True,
+                    'message': 'Account created successfully! You can now log in.'
+                })
+            else:
+                return jsonify({
+                    'success': False,
+                    'message': message
+                }), 400
+        
+        return jsonify({
+            'success': True,
+            'message': 'OTP verified successfully'
+        })
+        
+    except Exception as e:
+        print(f"OTP verification error: {e}")
+        return jsonify({
+            'success': False,
+            'message': 'Verification failed. Please try again.'
+        }), 500
+
+@app.route('/api/forgot-password', methods=['POST'])
+def api_forgot_password():
+    """Handle forgot password request"""
+    try:
+        data = request.get_json()
+        email = data.get('email', '').strip()
+        
+        if not email:
+            return jsonify({
+                'success': False,
+                'message': 'Email is required'
+            }), 400
+        
+        # Check if user exists
+        conn = auth_db.get_connection()
+        cursor = conn.cursor()
+        cursor.execute("SELECT id FROM users WHERE email = %s", (email,))
+        if not cursor.fetchone():
+            conn.close()
+            return jsonify({
+                'success': False,
+                'message': 'No account found with this email address'
+            }), 400
+        conn.close()
+        
+        # Generate and send OTP
+        otp = otp_service.generate_otp()
+        otp_stored = otp_service.store_otp(email, otp, "password_reset")
+        
+        if not otp_stored:
+            return jsonify({
+                'success': False,
+                'message': 'Failed to generate verification code. Please try again.'
+            }), 500
+        
+        # Send OTP email
+        email_sent = otp_service.send_otp_email(email, otp, "password_reset")
+        
+        if not email_sent:
+            return jsonify({
+                'success': False,
+                'message': 'Failed to send verification email. Please check your email address and try again.'
+            }), 500
+        
+        return jsonify({
+            'success': True,
+            'message': 'Password reset code sent to your email. Please check your inbox.'
+        })
+        
+    except Exception as e:
+        print(f"Forgot password error: {e}")
+        return jsonify({
+            'success': False,
+            'message': 'Request failed. Please try again.'
+        }), 500
+
+@app.route('/api/reset-password', methods=['POST'])
+def api_reset_password():
+    """Handle password reset with OTP verification"""
+    try:
+        data = request.get_json()
+        email = data.get('email', '').strip()
+        otp = data.get('otp', '').strip()
+        new_password = data.get('newPassword', '')
+        
+        if not all([email, otp, new_password]):
+            return jsonify({
+                'success': False,
+                'message': 'Email, OTP, and new password are required'
+            }), 400
+        
+        # Verify OTP
+        verification_result = otp_service.verify_otp(email, otp)
+        
+        if not verification_result['success']:
+            return jsonify({
+                'success': False,
+                'message': verification_result['message'],
+                'remaining_attempts': verification_result.get('remaining_attempts', 0)
+            }), 400
+        
+        # Check if this is for password reset
+        if verification_result.get('purpose') == 'password_reset':
+            # Reset password
+            success, message = auth_db.reset_user_password(email, new_password)
+            
+            if success:
+                return jsonify({
+                    'success': True,
+                    'message': 'Password reset successfully! You can now log in with your new password.'
+                })
+            else:
+                return jsonify({
+                    'success': False,
+                    'message': message
+                }), 400
+        
+        return jsonify({
+            'success': False,
+            'message': 'Invalid verification code'
+        }), 400
+        
+    except Exception as e:
+        print(f"Password reset error: {e}")
+        return jsonify({
+            'success': False,
+            'message': 'Password reset failed. Please try again.'
         }), 500
 
 @app.route('/api/login', methods=['POST'])

@@ -1,5 +1,5 @@
 """
-Email Service for MediBot
+Email Service for MediGuide
 Handles sending doctor recommendations via email using SMTP2GO
 """
 import os
@@ -22,8 +22,50 @@ class EmailService:
         self.smtp_port = int(os.getenv('SMTP_PORT', '587'))
         self.smtp_username = os.getenv('SMTP_USERNAME', '')
         self.smtp_password = os.getenv('SMTP_PASSWORD', '')
-        self.from_email = os.getenv('FROM_EMAIL', 'noreply@medibot.ai')
+        self.from_email = os.getenv('FROM_EMAIL', 'noreply@mediguide.ai')
         
+    def send_email(self, to_email: str, subject: str, html_content: str) -> bool:
+        """
+        Send email with custom subject and HTML content
+        
+        Args:
+            to_email: Recipient email address
+            subject: Email subject
+            html_content: HTML content of the email
+            
+        Returns:
+            bool: True if email sent successfully, False otherwise
+        """
+        try:
+            # Validate email address
+            if not self._is_valid_email(to_email):
+                print(f"❌ Invalid email address: {to_email}")
+                return False
+                
+            # Create message
+            message = MIMEMultipart("alternative")
+            message["Subject"] = subject
+            message["From"] = self.from_email
+            message["To"] = to_email
+            
+            # Create HTML part
+            html_part = MIMEText(html_content, "html")
+            message.attach(html_part)
+            
+            # Send email
+            context = ssl.create_default_context()
+            with smtplib.SMTP(self.smtp_server, self.smtp_port) as server:
+                server.starttls(context=context)
+                server.login(self.smtp_username, self.smtp_password)
+                server.sendmail(self.from_email, to_email, message.as_string())
+            
+            print(f"✅ Email sent successfully to {to_email}")
+            return True
+            
+        except Exception as e:
+            print(f"❌ Error sending email: {e}")
+            return False
+
     def send_doctor_recommendations(self, to_email: str, doctor_table_html: str, user_query: str = "") -> bool:
         """
         Send doctor recommendations via email
@@ -43,7 +85,7 @@ class EmailService:
                 return False
                 
             # Create email content
-            subject = "🏥 Your Doctor Recommendations from MediBot AI"
+            subject = "🏥 Your Doctor Recommendations from MediGuide"
             html_content = self._create_email_template(doctor_table_html, user_query)
             
             # Create message
@@ -76,7 +118,7 @@ class EmailService:
         <head>
             <meta charset="UTF-8">
             <meta name="viewport" content="width=device-width, initial-scale=1.0">
-            <title>Doctor Recommendations - MediBot AI</title>
+            <title>Doctor Recommendations - MediGuide</title>
             <style>
                 body {{
                     margin: 0;
@@ -223,13 +265,13 @@ class EmailService:
         <body>
             <div class="container">
                 <div class="header">
-                    <h1>🏥 MediBot AI</h1>
+                    <h1>🏥 MediGuide</h1>
                     <p>Your Personalized Doctor Recommendations</p>
                 </div>
                 
                 <div class="content">
                     <p>Dear Patient,</p>
-                    <p>Thank you for using MediBot AI. Based on your consultation, we have prepared personalized doctor recommendations for you.</p>
+                    <p>Thank you for using MediGuide. Based on your consultation, we have prepared personalized doctor recommendations for you.</p>
                     
                     {f'<div class="query-box"><h3>📝 Your Query:</h3><p>{user_query}</p></div>' if user_query else ''}
                     
@@ -248,7 +290,7 @@ class EmailService:
                 </div>
                 
                 <div class="footer">
-                    <p><strong>MediBot AI</strong> - Your AI Medical Assistant</p>
+                    <p><strong>MediGuide</strong> - Your AI Medical Assistant</p>
                     <p>Generated on {current_date}</p>
                     <p>This email was sent because you requested doctor recommendations through our platform.</p>
                 </div>

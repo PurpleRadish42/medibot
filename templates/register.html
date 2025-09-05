@@ -784,12 +784,21 @@
                 const data = await response.json();
 
                 if (data.success) {
-                    showAlert('Account created successfully! Redirecting to login...', 'success');
-                    
-                    // Redirect to login after short delay
-                    setTimeout(() => {
-                        window.location.href = '/login';
-                    }, 2000);
+                    if (data.requires_verification) {
+                        showAlert('Verification code sent to your email! Redirecting to verification page...', 'success');
+                        
+                        // Redirect to OTP verification page
+                        setTimeout(() => {
+                            window.location.href = `/verify-otp?email=${encodeURIComponent(userData.email)}`;
+                        }, 2000);
+                    } else {
+                        showAlert('Account created successfully! Redirecting to login...', 'success');
+                        
+                        // Redirect to login after short delay
+                        setTimeout(() => {
+                            window.location.href = '/login';
+                        }, 2000);
+                    }
                 } else {
                     showAlert(data.message || 'Registration failed. Please try again.', 'error');
                 }
