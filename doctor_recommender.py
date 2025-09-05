@@ -1,5 +1,5 @@
 """
-Doctor recommendation system - FIXED for your exact CSV specialties
+Doctor recommendation system - UPDATED to load from MySQL database
 """
 import pandas as pd
 import re
@@ -7,63 +7,164 @@ from pathlib import Path
 from typing import List, Dict, Optional
 import logging
 from markupsafe import Markup
+import pymysql
+import os
+from dotenv import load_dotenv
+
+# Load environment variables
+load_dotenv()
 
 class DoctorRecommender:
-    def __init__(self, csv_path: str = "cleaned_doctors_full.csv"):
+    def __init__(self, csv_path: str = None):
         self.csv_path = csv_path
         self.doctors_df = None
+        self.db_connection = None
         
-        # EXACT MAPPING to your CSV specialties
+        # EXACT MAPPING to database specialties (lowercase with hyphens)
         self.specialty_mapping = {
-            # Map AI recommendations to your exact CSV specialties
-            "ophthalmologist": "Ophthalmologist",
-            "eye specialist": "Ophthalmologist", 
-            "cardiologist": "Cardiologist",
-            "dermatologist": "Dermatologist",
-            "gastroenterologist": "Gastroenterologist",
-            "gynecologist": "Gynecologist",
-            "neurologist": "Neurologist",
-            "orthopedist": "Orthopedist",
-            "pediatrician": "Pediatrician",
-            "psychiatrist": "Psychiatrist",
-            "pulmonologist": "Pulmonologist",
-            "rheumatologist": "Rheumatologist",
-            "urologist": "Urologist",
-            "general practitioner": "General Physician",
-            "gp": "General Physician",
-            "ent specialist": "ENT Specialist",
-            "endocrinologist": "Endocrinologist",
-            "nephrologist": "Nephrologist",
-            "oncologist": "Oncologist",
+            # Map AI recommendations to exact database specialties
+            "ophthalmologist": "ophthalmologist",
+            "eye specialist": "ophthalmologist", 
+            "cardiologist": "cardiologist",
+            "dermatologist": "dermatologist",
+            "gastroenterologist": "gastroenterologist",
+            "gynecologist": "gynecologist",
+            "neurologist": "neurologist",
+            "orthopedist": "orthopedist",
+            "pediatrician": "pediatrician",
+            "psychiatrist": "psychiatrist",
+            "pulmonologist": "pulmonologist",
+            "rheumatologist": "rheumatologist",
+            "urologist": "urologist",
+            "general practitioner": "general-physician",
+            "gp": "general-physician",
+            "ent specialist": "ent-specialist",
+            "endocrinologist": "endocrinologist",
+            "nephrologist": "nephrologist",
+            "oncologist": "oncologist",
             
             # Additional mappings
-            "dentist": "Dentist",
-            "chiropractor": "Chiropractor",
-            "dietitian": "Dietitian/Nutritionist",
-            "nutritionist": "Dietitian/Nutritionist",
-            "infertility specialist": "Infertility Specialist",
-            "neurosurgeon": "Neurosurgeon",
-            "physiotherapist": "Physiotherapist",
-            "radiologist": "Radiologist",
-            "pathologist": "Pathologist",
-            "anesthesiologist": "Anesthesiologist",
-            "emergency medicine physician": "Emergency Medicine Physician",
-            "geriatrician": "Geriatrician",
-            "plastic surgeon": "Plastic Surgeon",
-            "vascular surgeon": "Vascular Surgeon",
-            "thoracic surgeon": "Thoracic Surgeon",
-            "bariatric surgeon": "bariatric surgeon",
-            "homeopath": "Homeopath",
-            "ayurveda": "Ayurveda",
-            "unani": "Unani",
-            "sexologist": "Sexologist",
-            "cosmetologist": "Cosmetologist"
+            "dentist": "dentist",
+            "chiropractor": "chiropractor",
+            "dietitian": "dietitian",
+            "nutritionist": "dietitian",
+            "infertility specialist": "infertility-specialist",
+            "neurosurgeon": "neurosurgeon",
+            "physiotherapist": "physiotherapist",
+            "radiologist": "radiologist",
+            "pathologist": "pathologist",
+            "anesthesiologist": "anesthesiologist",
+            "emergency medicine physician": "emergency-medicine-physician",
+            "geriatrician": "geriatrician",
+            "plastic surgeon": "plastic-surgeon",
+            "vascular surgeon": "vascular-surgeon",
+            "thoracic surgeon": "thoracic-surgeon",
+            "bariatric surgeon": "bariatric-surgeon",
+            "homeopath": "homeopath",
+            "ayurveda": "ayurveda",
+            "unani": "unani",
+            "sexologist": "sexologist",
+            "cosmetologist": "cosmetologist"
         }
         
         self.load_doctors_data()
     
     def load_doctors_data(self):
-        """Load and preprocess doctors data from CSV"""
+        """Load and preprocess doctors data from MySQL database"""
+        try:
+            # Try to load from database first
+            if self.load_from_database():
+                return True
+            
+            # Fallback to CSV if database fails
+            if self.csv_path and Path(self.csv_path).exists():
+                print("🔄 Database failed, falling back to CSV...")
+                return self.load_from_csv()
+            
+            print("❌ No data source available (database failed and CSV not found)")
+            return False
+            
+        except Exception as e:
+            print(f"❌ Error loading doctors data: {e}")
+            return False
+    
+    def load_from_database(self):
+        """Load doctors data from MySQL database"""
+        try:
+            # Database configuration
+            mysql_config = {
+                'host': os.getenv('MYSQL_HOST', 'localhost'),
+                'port': int(os.getenv('MYSQL_PORT', '3306')),
+                'user': os.getenv('MYSQL_USERNAME', 'root'),
+                'password': os.getenv('MYSQL_PASSWORD', ''),
+                'database': os.getenv('MYSQL_DATABASE', 'medibot2'),
+                'charset': 'utf8mb4',
+                'autocommit': True
+            }
+            
+            # Connect to database
+            self.db_connection = pymysql.connect(**mysql_config)
+            cursor = self.db_connection.cursor()
+            
+            # Load doctors data
+            query = """
+            SELECT 
+                id, name, specialty, degree, experience, experience_years,
+                consultation_fee, rating, bangalore_location, latitude, longitude,
+                google_maps_link, coordinates, source_url, created_at
+            FROM doctors 
+            WHERE specialty IS NOT NULL AND specialty != ''
+            ORDER BY rating DESC, experience_years DESC
+            """
+            
+            cursor.execute(query)
+            results = cursor.fetchall()
+            
+            if not results:
+                print("❌ No doctors found in database")
+                return False
+            
+            # Convert to DataFrame
+            columns = [
+                'id', 'name', 'specialty', 'degree', 'experience', 'experience_years',
+                'consultation_fee', 'rating', 'bangalore_location', 'latitude', 'longitude',
+                'google_maps_link', 'coordinates', 'source_url', 'created_at'
+            ]
+            
+            self.doctors_df = pd.DataFrame(results, columns=columns)
+            
+            # Map database columns to expected format
+            self.doctors_df['speciality'] = self.doctors_df['specialty']  # Map specialty to speciality
+            self.doctors_df['city'] = self.doctors_df['bangalore_location']  # Map location to city
+            self.doctors_df['year_of_experience'] = self.doctors_df['experience_years']  # Map experience
+            self.doctors_df['dp_score'] = self.doctors_df['rating']  # Map rating to dp_score
+            
+            # Fill missing values
+            self.doctors_df['speciality'] = self.doctors_df['speciality'].fillna('')
+            self.doctors_df['name'] = self.doctors_df['name'].fillna('Unknown')
+            self.doctors_df['city'] = self.doctors_df['city'].fillna('Unknown')
+            self.doctors_df['consultation_fee'] = pd.to_numeric(self.doctors_df['consultation_fee'], errors='coerce')
+            self.doctors_df['year_of_experience'] = pd.to_numeric(self.doctors_df['year_of_experience'], errors='coerce')
+            self.doctors_df['dp_score'] = pd.to_numeric(self.doctors_df['dp_score'], errors='coerce')
+            
+            print(f"📊 Loaded {len(self.doctors_df)} doctors from database")
+            print(f"📊 Unique specialties: {self.doctors_df['speciality'].nunique()}")
+            
+            # Show available specialties for debugging
+            print("🔍 Available specialties in database:")
+            unique_specialties = sorted(self.doctors_df['speciality'].unique())
+            for specialty in unique_specialties:
+                count = len(self.doctors_df[self.doctors_df['speciality'] == specialty])
+                print(f"  • {specialty} ({count} doctors)")
+            
+            return True
+            
+        except Exception as e:
+            print(f"❌ Database loading failed: {e}")
+            return False
+    
+    def load_from_csv(self):
+        """Fallback: Load doctors data from CSV file"""
         try:
             file_path = Path(self.csv_path)
             if not file_path.exists():
@@ -84,17 +185,10 @@ class DoctorRecommender:
             print(f"✅ Loaded {len(self.doctors_df)} doctors from CSV")
             print(f"📊 Unique specialties: {self.doctors_df['speciality'].nunique()}")
             
-            # Show available specialties for debugging
-            print("🔍 Available specialties in CSV:")
-            unique_specialties = sorted(self.doctors_df['speciality'].unique())
-            for specialty in unique_specialties:
-                count = len(self.doctors_df[self.doctors_df['speciality'] == specialty])
-                print(f"  • {specialty} ({count} doctors)")
-            
             return True
             
         except Exception as e:
-            print(f"❌ Error loading CSV: {e}")
+            print(f"❌ CSV loading failed: {e}")
             return False
     
     def find_specialty_match(self, recommended_specialist: str) -> str:

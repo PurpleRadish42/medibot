@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Chat - MedBot AI</title>
+    <title>Chat - MediGuide AI</title>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <style>
         * {
@@ -852,7 +852,7 @@
             
             <div class="chat-messages" id="chatMessages">
                 <div class="welcome-message">
-                    <h2>🏥 Welcome to MedBot AI</h2>
+                    <h2>🏥 Welcome to MediGuide AI</h2>
                     <p>I'm here to help you with medical questions and health concerns. Describe your symptoms and I'll guide you to the right specialist.</p>
                 </div>
             </div>
@@ -863,7 +863,7 @@
                     <i class="fas fa-robot"></i>
                 </div>
                 <div class="message-content">
-                    <span>MedBot is typing</span>
+                    <span>MediGuide is typing</span>
                     <div class="typing-dots">
                         <div class="typing-dot"></div>
                         <div class="typing-dot"></div>
@@ -1309,27 +1309,28 @@
             window.ChatState.resetInProgress = true;
             
             try {
-                // STEP 1: Reset server conversation state FIRST
-                console.log("🔄 Calling /api/reset endpoint...");
-                const resetResponse = await fetch('/api/reset', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({ action: 'reset_conversation' }) // Add explicit action
-                });
+                // STEP 1: Reset server conversation state FIRST (optional - may not be needed)
+                try {
+                    console.log("🔄 Calling /api/reset endpoint...");
+                    const resetResponse = await fetch('/api/reset', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({ action: 'reset_conversation' })
+                    });
 
-                if (!resetResponse.ok) {
-                    throw new Error(`Reset failed: ${resetResponse.status}`);
+                    if (resetResponse.ok) {
+                        const resetData = await resetResponse.json();
+                        console.log("✅ Server reset response:", resetData);
+                    } else {
+                        console.warn("⚠️ Server reset failed, continuing with local reset");
+                    }
+                } catch (resetError) {
+                    console.warn("⚠️ Server reset failed, continuing with local reset:", resetError);
                 }
-
-                const resetData = await resetResponse.json();
-                console.log("✅ Server reset response:", resetData);
                 
-                // STEP 2: Wait longer for server to fully reset
-                await new Promise(resolve => setTimeout(resolve, 1000));
-                
-                // STEP 3: Clear frontend state completely
+                // STEP 2: Clear frontend state completely
                 window.ChatState = {
                     currentChatId: null,
                     messageCount: 0,
@@ -1343,7 +1344,7 @@
                 const chatMessages = document.getElementById('chatMessages');
                 chatMessages.innerHTML = `
                     <div class="welcome-message">
-                        <h2>🏥 Welcome to MedBot AI</h2>
+                        <h2>🏥 Welcome to MediGuide AI</h2>
                         <p>I'm here to help you with medical questions and health concerns. Describe your symptoms and I'll guide you to the right specialist.</p>
                     </div>
                 `;
@@ -1425,7 +1426,7 @@
             chatHistoryContainer.insertBefore(chatItem, chatHistoryContainer.firstChild);
             
             // Store in localStorage for persistence
-            const savedChats = JSON.parse(localStorage.getItem('medbot_chats') || '[]');
+            const savedChats = JSON.parse(localStorage.getItem('mediguide_chats') || '[]');
             savedChats.unshift({
                 id: window.ChatState.currentChatId,
                 title: title,
@@ -1438,7 +1439,7 @@
                 savedChats.splice(50);
             }
             
-            localStorage.setItem('medbot_chats', JSON.stringify(savedChats));
+            localStorage.setItem('mediguide_chats', JSON.stringify(savedChats));
             
             // Also save as fallback for database-style loading (for when DB is unavailable)
             const fallbackKey = `chat_fallback_db-session-${Date.now()}`;
@@ -1460,7 +1461,7 @@
             let chat = null;
             
             // Try to find chat in localStorage first
-            const savedChats = JSON.parse(localStorage.getItem('medbot_chats') || '[]');
+            const savedChats = JSON.parse(localStorage.getItem('mediguide_chats') || '[]');
             chat = savedChats.find(c => c.id === chatId);
             
             // If not found in localStorage, try to load from database API
@@ -1472,9 +1473,14 @@
                     // Remove 'db-session-' prefix if present for backward compatibility
                     const actualConversationId = chatId.startsWith('db-session-') ? chatId.substring(11) : chatId;
                     
+                    console.log("🔍 Loading conversation with ID:", actualConversationId);
                     const response = await fetch(`/api/conversation/${actualConversationId}/messages`);
+                    console.log("📡 Database API response status:", response.status);
+                    
                     if (response.ok) {
                         const data = await response.json();
+                        console.log("📨 Database API response data:", data);
+                        
                         if (data.success) {
                             // Convert database message format to frontend format
                             const convertedMessages = convertDatabaseMessagesToFrontendFormat(data.messages || []);
@@ -1488,7 +1494,11 @@
                             };
                             
                             console.log(`✅ Loaded conversation ${actualConversationId} with ${chat.messages.length} messages from database`);
+                        } else {
+                            console.warn("❌ Database API returned error:", data.error);
                         }
+                    } else {
+                        console.warn("❌ Database API request failed:", response.status, response.statusText);
                     }
                 } catch (error) {
                     console.warn("⚠️  Database unavailable, trying local fallback:", error);
@@ -1612,9 +1622,9 @@
             event.stopPropagation();
             
             // Remove from localStorage
-            const savedChats = JSON.parse(localStorage.getItem('medbot_chats') || '[]');
+            const savedChats = JSON.parse(localStorage.getItem('mediguide_chats') || '[]');
             const updatedChats = savedChats.filter(chat => chat.id !== chatId);
-            localStorage.setItem('medbot_chats', JSON.stringify(updatedChats));
+            localStorage.setItem('mediguide_chats', JSON.stringify(updatedChats));
             
             // Remove from DOM immediately using data attribute
             const chatItem = document.querySelector(`[data-chat-id="${chatId}"]`);
@@ -1658,7 +1668,7 @@
                 }
                 
                 // Clear localStorage
-                localStorage.removeItem('medbot_chats');
+                localStorage.removeItem('mediguide_chats');
                 
                 // Clear sidebar
                 const chatHistoryContainer = document.getElementById('chatHistory');
@@ -1772,7 +1782,7 @@
             return sessions.reverse(); // Show newest first
         }
         
-        // Convert conversations API format to chat sessions (legacy)
+        // Convert conversations API format to chat sessions (FIXED)
         function convertConversationsToChatSessions(conversations) {
             const sessions = [];
             
@@ -1780,10 +1790,11 @@
                 sessions.push({
                     id: conv.id,
                     title: conv.title,
-                    messages: [], // Will be loaded when clicked
+                    messages: [], // Will be loaded when clicked - this is correct
                     date: conv.updated_at || conv.created_at,
                     source: 'database',
-                    messageCount: conv.message_count
+                    messageCount: conv.message_count,
+                    conversation_id: conv.id // Add this for proper API calls
                 });
             }
             
@@ -1801,8 +1812,8 @@
             
             // Sort messages by order and timestamp to ensure proper sequence
             const sortedMessages = dbMessages.sort((a, b) => {
-                if (a.order !== b.order) {
-                    return (a.order || 0) - (b.order || 0);
+                if (a.message_order !== b.message_order) {
+                    return (a.message_order || 0) - (b.message_order || 0);
                 }
                 return new Date(a.timestamp || 0) - new Date(b.timestamp || 0);
             });
@@ -1817,10 +1828,10 @@
                     });
                 }
                 
-                if (dbMsg.type === 'assistant' && dbMsg.response) {
+                if (dbMsg.type === 'assistant' && (dbMsg.response || dbMsg.message)) {
                     // Add assistant response (preserve HTML for doctor recommendations)
                     frontendMessages.push({
-                        content: dbMsg.response,
+                        content: dbMsg.response || dbMsg.message,
                         isUser: false,
                         timestamp: dbMsg.timestamp || new Date().toISOString()
                     });
@@ -1843,6 +1854,10 @@
             }
             
             console.log(`✅ Converted ${dbMessages.length} database messages to ${frontendMessages.length} frontend messages`);
+            console.log("🔍 Frontend messages preview:", frontendMessages.slice(0, 4).map(m => ({ 
+                isUser: m.isUser, 
+                content: m.content.substring(0, 50) + '...' 
+            })));
             return frontendMessages;
         }
         
@@ -1923,7 +1938,7 @@
 
         // Load saved chats from localStorage (legacy support)
         function loadSavedChats() {
-            const savedChats = JSON.parse(localStorage.getItem('medbot_chats') || '[]');
+            const savedChats = JSON.parse(localStorage.getItem('mediguide_chats') || '[]');
             const chatHistoryContainer = document.getElementById('chatHistory');
             
             savedChats.forEach(chat => {

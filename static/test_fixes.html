@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>MediBot Fix Testing</title>
+    <title>MediGuide Fix Testing</title>
     <style>
         body { font-family: Arial, sans-serif; margin: 20px; }
         .test-section { margin: 20px 0; padding: 20px; border: 1px solid #ccc; border-radius: 8px; }
@@ -17,7 +17,7 @@
     </style>
 </head>
 <body>
-    <h1>🩺 MediBot Fix Testing</h1>
+    <h1>🩺 MediGuide Fix Testing</h1>
     
     <div class="test-section">
         <h2>✅ Fix 1: Doctor Recommendations with Email Button</h2>
@@ -97,7 +97,7 @@
         // Test Fix 2: Chat History
         function showLocalStorage() {
             const testDiv = document.getElementById('chat-history-test');
-            const chats = JSON.parse(localStorage.getItem('medbot_chats') || '[]');
+            const chats = JSON.parse(localStorage.getItem('mediguide_chats') || '[]');
             const fallbackKeys = Object.keys(localStorage).filter(key => key.startsWith('chat_fallback_'));
             
             testDiv.innerHTML = `
@@ -111,7 +111,7 @@ ${JSON.stringify({regular_chats: chats, fallback_keys: fallbackKeys}, null, 2)}
         }
         
         function clearLocalStorage() {
-            localStorage.removeItem('medbot_chats');
+            localStorage.removeItem('mediguide_chats');
             Object.keys(localStorage).filter(key => key.startsWith('chat_fallback_')).forEach(key => {
                 localStorage.removeItem(key);
             });
@@ -131,9 +131,9 @@ ${JSON.stringify({regular_chats: chats, fallback_keys: fallbackKeys}, null, 2)}
                 date: new Date().toISOString()
             };
             
-            const chats = JSON.parse(localStorage.getItem('medbot_chats') || '[]');
+            const chats = JSON.parse(localStorage.getItem('mediguide_chats') || '[]');
             chats.unshift(testChat);
-            localStorage.setItem('medbot_chats', JSON.stringify(chats));
+            localStorage.setItem('mediguide_chats', JSON.stringify(chats));
             
             // Also save fallback
             const fallbackKey = `chat_fallback_db-session-${Date.now()}`;
