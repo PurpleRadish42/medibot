@@ -10,6 +10,7 @@ from markupsafe import Markup
 import mysql.connector
 from mysql.connector import Error
 import os
+import math
 from dotenv import load_dotenv
 
 # Load environment variables
@@ -174,6 +175,22 @@ class DoctorRecommender:
         if specialty_col in self.doctors_df.columns:
             self.doctors_df['speciality'] = self.doctors_df[specialty_col].fillna('')
         
+        # Handle experience column mapping (CSV uses 'experience_years', code expects 'year_of_experience')
+        if 'experience_years' in self.doctors_df.columns and 'year_of_experience' not in self.doctors_df.columns:
+            self.doctors_df['year_of_experience'] = self.doctors_df['experience_years']
+        
+        # Handle rating column mapping (CSV uses 'rating', code expects 'dp_score')
+        if 'rating' in self.doctors_df.columns and 'dp_score' not in self.doctors_df.columns:
+            self.doctors_df['dp_score'] = self.doctors_df['rating']
+        
+        # Handle Google Maps link mapping (CSV uses 'google_maps_link', code expects 'google_map_link')
+        if 'google_maps_link' in self.doctors_df.columns and 'google_map_link' not in self.doctors_df.columns:
+            self.doctors_df['google_map_link'] = self.doctors_df['google_maps_link']
+        
+        # Handle profile URL mapping (CSV uses 'source_url', code expects 'profile_url')
+        if 'source_url' in self.doctors_df.columns and 'profile_url' not in self.doctors_df.columns:
+            self.doctors_df['profile_url'] = self.doctors_df['source_url']
+            
         # Handle city column (database uses 'bangalore_location', CSV might use different names)
         if 'city' not in self.doctors_df.columns:
             if 'bangalore_location' in self.doctors_df.columns:
@@ -196,6 +213,24 @@ class DoctorRecommender:
         for specialty in unique_specialties:
             count = len(self.doctors_df[self.doctors_df['speciality'] == specialty])
             print(f"  • {specialty} ({count} doctors)")
+    
+    def calculate_distance(self, lat1: float, lon1: float, lat2: float, lon2: float) -> float:
+        """Calculate distance between two points using Haversine formula (in kilometers)"""
+        try:
+            # Convert latitude and longitude from degrees to radians
+            lat1, lon1, lat2, lon2 = map(math.radians, [lat1, lon1, lat2, lon2])
+            
+            # Haversine formula
+            dlat = lat2 - lat1
+            dlon = lon2 - lon1
+            a = math.sin(dlat/2)**2 + math.cos(lat1) * math.cos(lat2) * math.sin(dlon/2)**2
+            c = 2 * math.asin(math.sqrt(a))
+            
+            # Radius of earth in kilometers
+            r = 6371
+            return c * r
+        except (TypeError, ValueError):
+            return float('inf')  # Return infinite distance for invalid coordinates
     
     def get_data_source_info(self):
         """Get information about current data source"""
@@ -231,8 +266,8 @@ class DoctorRecommender:
         print(f"❌ No match found for '{recommended_specialist}'")
         return None
     
-    def recommend_doctors(self, specialist_type: str, city: str = None, limit: int = 5, sort_by: str = "rating") -> List[Dict]:
-        """Recommend doctors based on specialist type with sorting options - SIMPLIFIED"""
+    def recommend_doctors(self, specialist_type: str, city: str = None, limit: int = 5, sort_by: str = "rating", user_lat: float = None, user_lng: float = None) -> List[Dict]:
+        """Recommend doctors based on specialist type with sorting options - ENHANCED WITH LOCATION"""
         if self.doctors_df is None:
             print("❌ No doctor data loaded")
             return []
@@ -275,14 +310,27 @@ class DoctorRecommender:
             filtered_doctors['year_of_experience'] = filtered_doctors['year_of_experience'].fillna(0)
             filtered_doctors['consultation_fee'] = filtered_doctors['consultation_fee'].fillna(999999)
             
-            # Sort based on preference: Best rating first, most experience second, lowest fee third
-            if sort_by == "location" and city:
-                # For location-based sorting, we already filtered by city
-                # Sort by rating within the city
+            # Handle location-based sorting with coordinates
+            if sort_by == "location" and user_lat is not None and user_lng is not None:
+                # Calculate distance for each doctor using coordinates
+                filtered_doctors['distance_km'] = filtered_doctors.apply(
+                    lambda row: self.calculate_distance(
+                        user_lat, user_lng, 
+                        float(row['latitude']) if pd.notna(row['latitude']) else 0,
+                        float(row['longitude']) if pd.notna(row['longitude']) else 0
+                    ), axis=1
+                )
+                # Sort by distance first, then by rating
                 filtered_doctors = filtered_doctors.sort_values([
-                    'dp_score', 'year_of_experience', 'consultation_fee'
+                    'distance_km', 'dp_score', 'year_of_experience'
+                ], ascending=[True, False, False])
+                print(f"📍 Sorted by distance from user location ({user_lat:.4f}, {user_lng:.4f})")
+            elif sort_by == "experience":
+                # Sort by experience first, then rating, then fee
+                filtered_doctors = filtered_doctors.sort_values([
+                    'year_of_experience', 'dp_score', 'consultation_fee'
                 ], ascending=[False, False, True])
-                print(f"📍 Sorted by location (within {city}) and then by rating")
+                print(f"🎓 Sorted by experience and ratings")
             else:
                 # Default rating-based sorting: Best rating first, most experience first, lowest fee first
                 filtered_doctors = filtered_doctors.sort_values([
@@ -302,6 +350,10 @@ class DoctorRecommender:
                 consultation_fee = doctor.get('consultation_fee', 0)
                 rating = doctor.get('dp_score', 0)  # This is actually 'rating' from database, mapped to dp_score
                 
+                # Get distance if available
+                distance = doctor.get('distance_km', None)
+                distance_str = f"{distance:.1f} km" if distance is not None and distance != float('inf') else 'Location not available'
+                
                 recommendations.append({
                     'name': str(doctor['name']),
                     'specialty': str(doctor['speciality']),
@@ -311,6 +363,7 @@ class DoctorRecommender:
                     'experience_years': int(experience_years) if pd.notna(experience_years) and experience_years > 0 else 'Not specified',
                     'consultation_fee': f"₹{int(consultation_fee)}" if pd.notna(consultation_fee) and consultation_fee > 0 else 'Not specified',
                     'rating': f"{rating:.1f}★" if pd.notna(rating) and rating > 0 else 'Not rated',
+                    'distance': distance_str,
                     'profile_url': str(doctor.get('profile_url', '')),
                     'google_map_link': str(doctor.get('google_map_link', ''))
                 })
@@ -342,6 +395,7 @@ class DoctorRecommender:
                     <th style="border: 1px solid #dee2e6; padding: 12px; text-align: left; font-weight: bold;">Experience</th>
                     <th style="border: 1px solid #dee2e6; padding: 12px; text-align: left; font-weight: bold;">Consultation Fee</th>
                     <th style="border: 1px solid #dee2e6; padding: 12px; text-align: left; font-weight: bold;">Rating</th>
+                    <th style="border: 1px solid #dee2e6; padding: 12px; text-align: left; font-weight: bold;">Distance</th>
                     <th style="border: 1px solid #dee2e6; padding: 12px; text-align: left; font-weight: bold;">Location</th>
                     <th style="border: 1px solid #dee2e6; padding: 12px; text-align: left; font-weight: bold;">Profile</th>
                     <th style="border: 1px solid #dee2e6; padding: 12px; text-align: left; font-weight: bold;">Maps</th>
@@ -376,6 +430,7 @@ class DoctorRecommender:
                     <td style="border: 1px solid #dee2e6; padding: 10px; text-align: center;"><strong style="color: #17a2b8;">{doctor['experience_years']}</strong></td>
                     <td style="border: 1px solid #dee2e6; padding: 10px; text-align: center;"><strong style="color: #28a745;">{doctor['consultation_fee']}</strong></td>
                     <td style="border: 1px solid #dee2e6; padding: 10px; text-align: center;"><strong style="color: #ffc107;">{doctor['rating']}</strong></td>
+                    <td style="border: 1px solid #dee2e6; padding: 10px; text-align: center;"><strong style="color: #6f42c1;">{doctor['distance']}</strong></td>
                     <td style="border: 1px solid #dee2e6; padding: 10px;">{doctor['location']}</td>
                     <td style="border: 1px solid #dee2e6; padding: 10px; text-align: center;">{profile_link}</td>
                     <td style="border: 1px solid #dee2e6; padding: 10px; text-align: center;">{maps_link}</td>
