@@ -10,11 +10,20 @@ from typing import Dict, List, Any, Optional
 from PIL import Image
 import random
 
-# Import the advanced medical analyzer
+# Import the optimized analyzer (fast and accurate)
+try:
+    from src.ai.optimized_skin_analyzer import analyze_skin_image_optimized
+    OPTIMIZED_ANALYZER_AVAILABLE = True
+    print("✅ Optimized skin analyzer available")
+except ImportError:
+    OPTIMIZED_ANALYZER_AVAILABLE = False
+    print("⚠️ Optimized analyzer not available")
+
+# Import the advanced medical analyzer (fallback for special cases)
 try:
     from src.ai.advanced_medical_analyzer import analyze_medical_image, TORCH_AVAILABLE
     ADVANCED_ANALYZER_AVAILABLE = True
-    print("✅ Advanced medical analyzer available")
+    print("✅ Advanced medical analyzer available (fallback)")
 except ImportError:
     ADVANCED_ANALYZER_AVAILABLE = False
     print("⚠️ Advanced medical analyzer not available, using basic analyzer")
@@ -247,7 +256,7 @@ class SkinConditionAnalyzer:
     def analyze_skin_condition(self, image_data: bytes, user_city: str = None) -> Dict[str, Any]:
         """
         Enhanced main method to analyze skin condition from image
-        Uses advanced ML models when available, falls back to basic analysis
+        Uses optimized analyzer first for fast results, falls back to advanced/basic as needed
         
         Args:
             image_data: Raw image bytes
@@ -257,9 +266,13 @@ class SkinConditionAnalyzer:
             Analysis results with conditions, specialist recommendations, and doctors
         """
         try:
-            # Try advanced analysis first if available
-            if ADVANCED_ANALYZER_AVAILABLE:
+            # Try optimized analysis first (fastest, good accuracy)
+            if OPTIMIZED_ANALYZER_AVAILABLE:
+                return self._analyze_with_optimized_model(image_data, user_city)
+            # Fall back to advanced analysis if available
+            elif ADVANCED_ANALYZER_AVAILABLE:
                 return self._analyze_with_advanced_models(image_data, user_city)
+            # Final fallback to basic analysis
             else:
                 return self._analyze_with_basic_model(image_data, user_city)
                 
@@ -269,6 +282,22 @@ class SkinConditionAnalyzer:
                 "success": False,
                 "error": f"Analysis failed: {str(e)}"
             }
+    
+    def _analyze_with_optimized_model(self, image_data: bytes, user_city: str = None) -> Dict[str, Any]:
+        """
+        Analyze using the fast optimized model (primary method)
+        """
+        try:
+            # Use the optimized analyzer directly
+            return analyze_skin_image_optimized(image_data, user_city)
+            
+        except Exception as e:
+            self.logger.error(f"Optimized analysis failed: {e}")
+            # Fall back to advanced analysis
+            if ADVANCED_ANALYZER_AVAILABLE:
+                return self._analyze_with_advanced_models(image_data, user_city)
+            else:
+                return self._analyze_with_basic_model(image_data, user_city)
     
     def _analyze_with_advanced_models(self, image_data: bytes, user_city: str = None) -> Dict[str, Any]:
         """
