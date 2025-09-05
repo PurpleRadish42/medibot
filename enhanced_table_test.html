@@ -1,0 +1,112 @@
+
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Enhanced Doctor Table Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🏥 Enhanced Doctor Recommendation Table</h1>
+        <p><strong>New Features:</strong></p>
+        <ul>
+            <li>✅ Experience Years column</li>
+            <li>✅ Consultation Fee column</li>
+            <li>✅ Rating column (with stars)</li>
+            <li>❌ Removed DP Score column</li>
+            <li>🎨 Better styling and layout</li>
+        </ul>
+        <p>Based on your symptoms, I recommend consulting a <strong>Cardiologist</strong>. Here are 3 qualified doctors I found:</p>
+
+
+        <table style="border-collapse: collapse; width: 100%; margin: 20px 0; font-family: Arial, sans-serif; background: rgba(255, 255, 255, 0.9); border-radius: 8px; overflow: hidden;">
+            <thead>
+                <tr style="background: linear-gradient(45deg, #4facfe, #00f2fe); color: white; border-bottom: 2px solid #dee2e6;">
+                    <th style="border: 1px solid #dee2e6; padding: 12px; text-align: left; font-weight: bold;">#</th>
+                    <th style="border: 1px solid #dee2e6; padding: 12px; text-align: left; font-weight: bold;">Doctor Name</th>
+                    <th style="border: 1px solid #dee2e6; padding: 12px; text-align: left; font-weight: bold;">Specialty</th>
+                    <th style="border: 1px solid #dee2e6; padding: 12px; text-align: left; font-weight: bold;">Qualification</th>
+                    <th style="border: 1px solid #dee2e6; padding: 12px; text-align: left; font-weight: bold;">Experience</th>
+                    <th style="border: 1px solid #dee2e6; padding: 12px; text-align: left; font-weight: bold;">Consultation Fee</th>
+                    <th style="border: 1px solid #dee2e6; padding: 12px; text-align: left; font-weight: bold;">Rating</th>
+                    <th style="border: 1px solid #dee2e6; padding: 12px; text-align: left; font-weight: bold;">Location</th>
+                    <th style="border: 1px solid #dee2e6; padding: 12px; text-align: left; font-weight: bold;">Profile</th>
+                    <th style="border: 1px solid #dee2e6; padding: 12px; text-align: left; font-weight: bold;">Maps</th>
+                </tr>
+            </thead>
+            <tbody>
+        
+                <tr style="background-color: #ffffff;">
+                    <td style="border: 1px solid #dee2e6; padding: 10px; text-align: center; font-weight: bold; color: #4facfe;">1</td>
+                    <td style="border: 1px solid #dee2e6; padding: 10px;"><strong>Dr. Shyam Sunder K R</strong></td>
+                    <td style="border: 1px solid #dee2e6; padding: 10px;">cardiologist</td>
+                    <td style="border: 1px solid #dee2e6; padding: 10px; font-size: 0.9em;">MBBS, DM - Cardiology</td>
+                    <td style="border: 1px solid #dee2e6; padding: 10px; text-align: center;"><strong style="color: #17a2b8;">38</strong></td>
+                    <td style="border: 1px solid #dee2e6; padding: 10px; text-align: center;"><strong style="color: #28a745;">₹1250</strong></td>
+                    <td style="border: 1px solid #dee2e6; padding: 10px; text-align: center;"><strong style="color: #ffc107;">5.0★</strong></td>
+                    <td style="border: 1px solid #dee2e6; padding: 10px;">Bangalore</td>
+                    <td style="border: 1px solid #dee2e6; padding: 10px; text-align: center;"><a href="https://www.practo.com/bangalore/doctor/dr-shyam-sunder-k-r-cardiologist" target="_blank" style="color: #007bff; text-decoration: none; font-weight: bold;">View Profile</a></td>
+                    <td style="border: 1px solid #dee2e6; padding: 10px; text-align: center;"><a href="http://www.google.com/maps/place/12.9108543526037,77.58517026901245" target="_blank" style="color: #007bff; text-decoration: none; font-weight: bold;">View Map</a></td>
+                </tr>
+            
+                <tr style="background-color: #f8f9fa;">
+                    <td style="border: 1px solid #dee2e6; padding: 10px; text-align: center; font-weight: bold; color: #4facfe;">2</td>
+                    <td style="border: 1px solid #dee2e6; padding: 10px;"><strong>Dr. A Naga Srinivaas</strong></td>
+                    <td style="border: 1px solid #dee2e6; padding: 10px;">cardiologist</td>
+                    <td style="border: 1px solid #dee2e6; padding: 10px; font-size: 0.9em;">MBBS, MD - General Medicine, DM - Cardiology</td>
+                    <td style="border: 1px solid #dee2e6; padding: 10px; text-align: center;"><strong style="color: #17a2b8;">37</strong></td>
+                    <td style="border: 1px solid #dee2e6; padding: 10px; text-align: center;"><strong style="color: #28a745;">₹1000</strong></td>
+                    <td style="border: 1px solid #dee2e6; padding: 10px; text-align: center;"><strong style="color: #ffc107;">5.0★</strong></td>
+                    <td style="border: 1px solid #dee2e6; padding: 10px;">Bangalore</td>
+                    <td style="border: 1px solid #dee2e6; padding: 10px; text-align: center;"><a href="https://www.practo.com/bangalore/doctor/dr-a-naga-srinivaas-cardiologist" target="_blank" style="color: #007bff; text-decoration: none; font-weight: bold;">View Profile</a></td>
+                    <td style="border: 1px solid #dee2e6; padding: 10px; text-align: center;"><a href="http://www.google.com/maps/place/12.9912,77.7232" target="_blank" style="color: #007bff; text-decoration: none; font-weight: bold;">View Map</a></td>
+                </tr>
+            
+                <tr style="background-color: #ffffff;">
+                    <td style="border: 1px solid #dee2e6; padding: 10px; text-align: center; font-weight: bold; color: #4facfe;">3</td>
+                    <td style="border: 1px solid #dee2e6; padding: 10px;"><strong>Dr. Nagamalesh U M</strong></td>
+                    <td style="border: 1px solid #dee2e6; padding: 10px;">cardiologist</td>
+                    <td style="border: 1px solid #dee2e6; padding: 10px; font-size: 0.9em;">MBBS, DNB - Cardiology</td>
+                    <td style="border: 1px solid #dee2e6; padding: 10px; text-align: center;"><strong style="color: #17a2b8;">31</strong></td>
+                    <td style="border: 1px solid #dee2e6; padding: 10px; text-align: center;"><strong style="color: #28a745;">₹1250</strong></td>
+                    <td style="border: 1px solid #dee2e6; padding: 10px; text-align: center;"><strong style="color: #ffc107;">5.0★</strong></td>
+                    <td style="border: 1px solid #dee2e6; padding: 10px;">Bangalore</td>
+                    <td style="border: 1px solid #dee2e6; padding: 10px; text-align: center;"><a href="https://www.practo.com/bangalore/doctor/dr-nagamalesh-u-m-cardiologist" target="_blank" style="color: #007bff; text-decoration: none; font-weight: bold;">View Profile</a></td>
+                    <td style="border: 1px solid #dee2e6; padding: 10px; text-align: center;"><a href="http://www.google.com/maps/place/12.9108543526037,77.58517026901245" target="_blank" style="color: #007bff; text-decoration: none; font-weight: bold;">View Map</a></td>
+                </tr>
+            
+            </tbody>
+        </table>
+        
+        <div style="margin-top: 20px; padding: 15px; background: linear-gradient(45deg, #e9ecef, #f8f9fa); border-radius: 8px; font-family: Arial, sans-serif; border-left: 4px solid #4facfe;">
+            <h4 style="margin-top: 0; color: #495057; display: flex; align-items: center;"><i class="fas fa-clipboard-list" style="margin-right: 8px; color: #4facfe;"></i> Important Notes:</h4>
+            <ul style="margin-bottom: 0; color: #6c757d; line-height: 1.6;">
+                <li>Please verify doctor availability before visiting</li>
+                <li>Consultation fees may have changed</li>
+                <li>In case of emergency, visit the nearest hospital immediately</li>
+                <li>This is for informational purposes only</li>
+            </ul>
+        </div>
+        
+    </div>
+</body>
+</html>
+            
