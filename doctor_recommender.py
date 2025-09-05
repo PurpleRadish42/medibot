@@ -389,12 +389,66 @@ class DoctorRecommender:
                     ], ascending=[False, False])
                     print(f"⚠️ No doctors with valid coordinates, sorting by rating instead")
             elif sort_by == "experience":
+                # Calculate distance if location is available
+                if user_lat is not None and user_lng is not None:
+                    valid_coords = (
+                        pd.notna(filtered_doctors['latitude']) & 
+                        pd.notna(filtered_doctors['longitude']) &
+                        (filtered_doctors['latitude'] != 0) &
+                        (filtered_doctors['longitude'] != 0)
+                    )
+                    doctors_with_coords = filtered_doctors[valid_coords].copy()
+                    doctors_without_coords = filtered_doctors[~valid_coords].copy()
+                    
+                    if not doctors_with_coords.empty:
+                        doctors_with_coords['distance_km'] = doctors_with_coords.apply(
+                            lambda row: self.calculate_distance(
+                                user_lat, user_lng, 
+                                float(row['latitude']), 
+                                float(row['longitude'])
+                            ), axis=1
+                        )
+                        doctors_without_coords['distance_km'] = 999999
+                        filtered_doctors = pd.concat([doctors_with_coords, doctors_without_coords], ignore_index=True)
+                        print(f"📍 Calculated distances for experience sorting")
+                    else:
+                        filtered_doctors['distance_km'] = 999999
+                else:
+                    filtered_doctors['distance_km'] = None
+                
                 # Sort by experience first, then rating, then fee
                 filtered_doctors = filtered_doctors.sort_values([
                     'year_of_experience', 'dp_score', 'consultation_fee'
                 ], ascending=[False, False, True])
                 print(f"🎓 Sorted by experience and ratings")
             else:
+                # Calculate distance if location is available
+                if user_lat is not None and user_lng is not None:
+                    valid_coords = (
+                        pd.notna(filtered_doctors['latitude']) & 
+                        pd.notna(filtered_doctors['longitude']) &
+                        (filtered_doctors['latitude'] != 0) &
+                        (filtered_doctors['longitude'] != 0)
+                    )
+                    doctors_with_coords = filtered_doctors[valid_coords].copy()
+                    doctors_without_coords = filtered_doctors[~valid_coords].copy()
+                    
+                    if not doctors_with_coords.empty:
+                        doctors_with_coords['distance_km'] = doctors_with_coords.apply(
+                            lambda row: self.calculate_distance(
+                                user_lat, user_lng, 
+                                float(row['latitude']), 
+                                float(row['longitude'])
+                            ), axis=1
+                        )
+                        doctors_without_coords['distance_km'] = 999999
+                        filtered_doctors = pd.concat([doctors_with_coords, doctors_without_coords], ignore_index=True)
+                        print(f"📍 Calculated distances for rating sorting")
+                    else:
+                        filtered_doctors['distance_km'] = 999999
+                else:
+                    filtered_doctors['distance_km'] = None
+                
                 # Default rating-based sorting: Best rating first, most experience first, lowest fee first
                 filtered_doctors = filtered_doctors.sort_values([
                     'dp_score', 'year_of_experience', 'consultation_fee'
