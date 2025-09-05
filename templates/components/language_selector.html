@@ -1,0 +1,195 @@
+<!-- Language Selector Component -->
+<!-- Add this to your templates (chat.html, login.html, etc.) -->
+
+<div class="language-selector">
+    <select id="languageSelect" onchange="changeLanguage()" class="language-dropdown">
+        <option value="en" data-text="English">🇺🇸 English</option>
+        <option value="hi" data-text="हिन्दी">🇮🇳 हिन्दी</option>
+        <option value="kn" data-text="ಕನ್ನಡ">🇮🇳 ಕನ್ನಡ</option>
+        <option value="ta" data-text="தமிழ்">🇮🇳 தமிழ்</option>
+        <option value="te" data-text="తెలుగు">🇮🇳 తెలుగు</option>
+        <option value="ml" data-text="മലയാളം">🇮🇳 മലയാളം</option>
+        <option value="bn" data-text="বাংলা">🇮🇳 বাংলা</option>
+        <option value="gu" data-text="ગુજરાતી">🇮🇳 ગુજરાતી</option>
+        <option value="mr" data-text="मराठी">🇮🇳 मराठी</option>
+        <option value="pa" data-text="ਪੰਜਾਬੀ">🇮🇳 ਪੰਜਾਬੀ</option>
+    </select>
+</div>
+
+<!-- Language Selector CSS -->
+<style>
+.language-selector {
+    position: relative;
+    margin: 0.5rem;
+}
+
+.language-dropdown {
+    background: rgba(255, 255, 255, 0.1);
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    border-radius: 8px;
+    color: white;
+    padding: 0.5rem 1rem;
+    font-size: 0.9rem;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    min-width: 150px;
+}
+
+.language-dropdown:hover {
+    background: rgba(255, 255, 255, 0.2);
+    border-color: #4facfe;
+}
+
+.language-dropdown:focus {
+    outline: none;
+    border-color: #4facfe;
+    box-shadow: 0 0 0 2px rgba(79, 172, 254, 0.2);
+}
+
+.language-dropdown option {
+    background: #2d3748;
+    color: white;
+    padding: 0.5rem;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+    .language-dropdown {
+        min-width: 120px;
+        font-size: 0.8rem;
+        padding: 0.4rem 0.8rem;
+    }
+}
+</style>
+
+<!-- Language Management JavaScript -->
+<script>
+// Language management system
+window.LanguageManager = {
+    currentLanguage: 'en',
+    translations: {},
+    
+    // Initialize language system
+    async init() {
+        try {
+            // Get current language from server
+            const response = await fetch('/api/languages');
+            const data = await response.json();
+            this.currentLanguage = data.current;
+            
+            // Set dropdown value
+            const languageSelect = document.getElementById('languageSelect');
+            if (languageSelect) {
+                languageSelect.value = this.currentLanguage;
+            }
+            
+            // Load translations for current language
+            await this.loadTranslations(this.currentLanguage);
+            
+        } catch (error) {
+            console.error('Error initializing language system:', error);
+        }
+    },
+    
+    // Load translations for a specific language
+    async loadTranslations(languageCode) {
+        try {
+            const response = await fetch(`/static/i18n/${languageCode}.json`);
+            if (response.ok) {
+                this.translations[languageCode] = await response.json();
+                this.applyTranslations();
+            }
+        } catch (error) {
+            console.error(`Error loading translations for ${languageCode}:`, error);
+        }
+    },
+    
+    // Apply translations to current page
+    applyTranslations() {
+        const currentTranslations = this.translations[this.currentLanguage];
+        if (!currentTranslations) return;
+        
+        // Translate elements with data-translate attribute
+        document.querySelectorAll('[data-translate]').forEach(element => {
+            const key = element.getAttribute('data-translate');
+            if (currentTranslations[key]) {
+                if (element.tagName.toLowerCase() === 'input' && element.type === 'text') {
+                    element.placeholder = currentTranslations[key];
+                } else {
+                    element.textContent = currentTranslations[key];
+                }
+            }
+        });
+        
+        // Update page title
+        if (currentTranslations.app_title) {
+            document.title = currentTranslations.app_title;
+        }
+    },
+    
+    // Get translated text
+    getText(key, params = {}) {
+        const currentTranslations = this.translations[this.currentLanguage];
+        if (!currentTranslations || !currentTranslations[key]) {
+            return key; // Return key if translation not found
+        }
+        
+        let text = currentTranslations[key];
+        
+        // Replace parameters
+        Object.keys(params).forEach(param => {
+            text = text.replace(`{${param}}`, params[param]);
+        });
+        
+        return text;
+    }
+};
+
+// Change language function
+async function changeLanguage() {
+    const languageSelect = document.getElementById('languageSelect');
+    const selectedLanguage = languageSelect.value;
+    
+    try {
+        // Update language on server
+        const response = await fetch(`/set_language/${selectedLanguage}`, {
+            method: 'GET'
+        });
+        
+        if (response.ok) {
+            const data = await response.json();
+            
+            // Update local language
+            window.LanguageManager.currentLanguage = selectedLanguage;
+            
+            // Load new translations
+            await window.LanguageManager.loadTranslations(selectedLanguage);
+            
+            // Show success message
+            if (window.showStatus) {
+                window.showStatus(data.message, 'success');
+            }
+            
+            // Refresh page to apply new language
+            setTimeout(() => {
+                window.location.reload();
+            }, 1000);
+            
+        } else {
+            console.error('Error changing language');
+            // Reset dropdown to previous value
+            languageSelect.value = window.LanguageManager.currentLanguage;
+        }
+        
+    } catch (error) {
+        console.error('Error changing language:', error);
+        // Reset dropdown to previous value
+        languageSelect.value = window.LanguageManager.currentLanguage;
+    }
+}
+
+// Initialize language system when page loads
+document.addEventListener('DOMContentLoaded', function() {
+    window.LanguageManager.init();
+});
+</script>

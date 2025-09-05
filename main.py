@@ -1258,17 +1258,24 @@ def api_find_similar_symptoms():
         print(f"Find similar symptoms API error: {e}")
         return jsonify({'success': False, 'error': str(e)}), 500
 
-# SKIN ANALYZER ROUTES
+# MEDICAL IMAGE ANALYZER ROUTES
+@app.route('/medical-image-analyzer')
+@login_required
+def medical_image_analyzer():
+    """Medical image analyzer page"""
+    return render_template('medical_image_analyzer.html')
+
+# Keep the old skin analyzer route for backward compatibility
 @app.route('/skin-analyzer')
 @login_required
 def skin_analyzer():
-    """Skin condition analyzer page"""
-    return render_template('skin_analyzer.html')
+    """Redirect to the new medical image analyzer"""
+    return redirect(url_for('medical_image_analyzer'))
 
-@app.route('/api/v1/analyze-skin', methods=['POST'])
+@app.route('/api/v1/analyze-medical-image', methods=['POST'])
 @login_required
-def api_analyze_skin():
-    """API endpoint for skin condition analysis"""
+def api_analyze_medical_image():
+    """API endpoint for medical image analysis using OpenAI Vision"""
     try:
         # Check if image file is present
         if 'image' not in request.files:
@@ -1288,37 +1295,52 @@ def api_analyze_skin():
         # Read image data
         image_data = image_file.read()
         
-        # Get user city from form data if provided
+        # Get image type, user city, and location from form data
+        image_type = request.form.get('image_type', 'general')
         user_city = request.form.get('city', None)
         
-        print(f"🔬 Analyzing skin image for user {request.user['id']}")
-        print(f"   Image size: {len(image_data)} bytes")
-        print(f"   User city: {user_city}")
+        # Get user location if available (from JSON in userLocation field)
+        user_location = None
+        user_location_str = request.form.get('userLocation')
+        if user_location_str:
+            try:
+                import json
+                user_location = json.loads(user_location_str)
+                print(f"   User location: {user_location}")
+            except json.JSONDecodeError:
+                print(f"   Failed to parse user location: {user_location_str}")
         
-        # Import and use skin analyzer
+        print(f"🔬 Analyzing medical image for user {request.user['id']}")
+        print(f"   Image size: {len(image_data)} bytes")
+        print(f"   Image type: {image_type}")
+        print(f"   User city: {user_city}")
+        print(f"   User location: {user_location}")
+        
+        # Import and use medical image analyzer
         try:
-            from src.ai.skin_analyzer import analyze_skin_image
-            result = analyze_skin_image(image_data, user_city)
+            from src.ai.medical_image_analyzer import analyze_medical_image
+            result = analyze_medical_image(image_data, image_type, user_city, user_location)
             
             if result['success']:
-                print(f"✅ Skin analysis completed successfully")
-                print(f"   Found {len(result['analysis']['conditions'])} potential conditions")
+                print(f"✅ Medical image analysis completed successfully")
+                print(f"   Category: {result['analysis']['category']}")
                 print(f"   Recommended specialist: {result['analysis']['specialist_type']}")
                 print(f"   Found {len(result['analysis']['doctors'])} doctors")
+                print(f"   Model used: {result['analysis']['model_used']}")
                 
                 return jsonify(result)
             else:
-                print(f"❌ Skin analysis failed: {result.get('error', 'Unknown error')}")
+                print(f"❌ Medical image analysis failed: {result.get('error', 'Unknown error')}")
                 return jsonify(result), 400
                 
         except ImportError as e:
-            print(f"❌ Skin analyzer import error: {e}")
+            print(f"❌ Medical image analyzer import error: {e}")
             return jsonify({
                 'success': False,
-                'message': 'Skin analyzer not available'
+                'message': 'Medical image analyzer not available. Please check OpenAI API configuration.'
             }), 500
         except Exception as e:
-            print(f"❌ Skin analysis error: {e}")
+            print(f"❌ Medical image analysis error: {e}")
             import traceback
             traceback.print_exc()
             return jsonify({
@@ -1327,13 +1349,23 @@ def api_analyze_skin():
             }), 500
     
     except Exception as e:
-        print(f"❌ API Error in /api/v1/analyze-skin: {e}")
+        print(f"❌ API Error in /api/v1/analyze-medical-image: {e}")
         import traceback
         traceback.print_exc()
         return jsonify({
             'success': False,
             'message': 'Internal server error'
         }), 500
+
+# Keep the old skin analyzer API for backward compatibility
+@app.route('/api/v1/analyze-skin', methods=['POST'])
+@login_required
+def api_analyze_skin():
+    """Legacy API endpoint - redirects to medical image analyzer"""
+    # Forward the request to the new medical image analyzer with skin type
+    request.form = request.form.copy()
+    request.form['image_type'] = 'skin'
+    return api_analyze_medical_image()
 
 def run_gradio():
     """Run Gradio in a separate thread"""

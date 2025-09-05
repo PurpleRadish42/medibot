@@ -477,10 +477,13 @@ class DoctorRecommender:
                     'degree': str(doctor.get('degree', 'Not specified')),
                     'city': str(doctor['city']),
                     'location': str(doctor.get('location', 'Location not specified')),
-                    'experience_years': int(experience_years) if pd.notna(experience_years) and experience_years > 0 else 'Not specified',
-                    'consultation_fee': f"₹{int(consultation_fee)}" if pd.notna(consultation_fee) and consultation_fee > 0 else 'Not specified',
-                    'rating': f"{rating:.1f}★" if pd.notna(rating) and rating > 0 else 'Not rated',
-                    'distance': distance_str,
+                    'year_of_experience': int(experience_years) if pd.notna(experience_years) and experience_years > 0 else 0,
+                    'consultation_fee': int(consultation_fee) if pd.notna(consultation_fee) and consultation_fee > 0 else 0,
+                    'dp_score': float(rating) if pd.notna(rating) and rating > 0 else 0,
+                    'distance_km': distance if distance is not None else 999999,
+                    'distance': distance_str,  # Keep for backward compatibility
+                    'rating': f"{rating:.1f}★" if pd.notna(rating) and rating > 0 else 'Not rated',  # Keep for backward compatibility
+                    'experience_years': int(experience_years) if pd.notna(experience_years) and experience_years > 0 else 'Not specified',  # Keep for backward compatibility
                     'profile_url': str(doctor.get('profile_url', '')),
                     'google_map_link': str(doctor.get('google_map_link', ''))
                 })

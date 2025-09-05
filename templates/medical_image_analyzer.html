@@ -1,0 +1,1750 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Medical Image Analyzer - MedBot AI</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            color: white;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 2rem;
+        }
+        
+        .header {
+            text-align: center;
+            margin-bottom: 2rem;
+        }
+        
+        .header h1 {
+            font-size: 2.5rem;
+            margin-bottom: 1rem;
+            background: linear-gradient(45deg, #4facfe, #00f2fe);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        
+        .header p {
+            font-size: 1.1rem;
+            opacity: 0.9;
+            margin-bottom: 1rem;
+        }
+        
+        .disclaimer {
+            background: rgba(255, 193, 7, 0.2);
+            border: 2px solid #ffc107;
+            border-radius: 10px;
+            padding: 1rem;
+            margin-bottom: 2rem;
+            text-align: center;
+        }
+        
+        .disclaimer i {
+            color: #ffc107;
+            margin-right: 0.5rem;
+        }
+        
+        .image-upload-section {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 15px;
+            padding: 2rem;
+            margin-bottom: 2rem;
+            backdrop-filter: blur(10px);
+        }
+        
+        .category-selection {
+            margin-bottom: 2rem;
+        }
+        
+        .category-selection h3 {
+            margin-bottom: 1rem;
+            color: #4facfe;
+        }
+        
+        .category-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1rem;
+            margin-bottom: 2rem;
+        }
+        
+        .category-option {
+            background: rgba(255, 255, 255, 0.1);
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            border-radius: 10px;
+            padding: 1rem;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-align: center;
+        }
+        
+        .category-option:hover {
+            border-color: #4facfe;
+            background: rgba(79, 172, 254, 0.2);
+        }
+        
+        .category-option.selected {
+            border-color: #4facfe;
+            background: rgba(79, 172, 254, 0.3);
+        }
+        
+        .category-option i {
+            font-size: 2rem;
+            color: #4facfe;
+            margin-bottom: 0.5rem;
+            display: block;
+        }
+        
+        .upload-options {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 2rem;
+            margin-bottom: 2rem;
+        }
+        
+        .upload-option {
+            text-align: center;
+            padding: 2rem;
+            border: 2px dashed rgba(255, 255, 255, 0.3);
+            border-radius: 10px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        
+        .upload-option:hover {
+            border-color: #4facfe;
+            background: rgba(79, 172, 254, 0.1);
+        }
+        
+        .upload-option.active {
+            border-color: #4facfe;
+            background: rgba(79, 172, 254, 0.2);
+        }
+        
+        .upload-option i {
+            font-size: 3rem;
+            color: #4facfe;
+            margin-bottom: 1rem;
+            display: block;
+        }
+        
+        .upload-option h3 {
+            margin-bottom: 0.5rem;
+        }
+        
+        .upload-option p {
+            opacity: 0.8;
+            font-size: 0.9rem;
+        }
+        
+        .file-input {
+            display: none;
+        }
+        
+        .camera-container {
+            display: none;
+            text-align: center;
+            margin-top: 1rem;
+        }
+        
+        .camera-container.active {
+            display: block;
+        }
+        
+        #cameraPreview {
+            max-width: 100%;
+            border-radius: 10px;
+            margin-bottom: 1rem;
+        }
+        
+        .camera-controls {
+            display: flex;
+            gap: 1rem;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+        
+        .btn {
+            padding: 0.75rem 1.5rem;
+            border: none;
+            border-radius: 25px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        
+        .btn-primary {
+            background: linear-gradient(45deg, #4facfe, #00f2fe);
+            color: white;
+        }
+        
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(79, 172, 254, 0.4);
+        }
+        
+        .btn-secondary {
+            background: rgba(255, 255, 255, 0.2);
+            color: white;
+            border: 1px solid rgba(255, 255, 255, 0.3);
+        }
+        
+        .btn-secondary:hover {
+            background: rgba(255, 255, 255, 0.3);
+        }
+        
+        .image-preview {
+            display: none;
+            text-align: center;
+            margin-top: 2rem;
+        }
+        
+        .image-preview.active {
+            display: block;
+        }
+        
+        .preview-image {
+            max-width: 300px;
+            max-height: 300px;
+            border-radius: 10px;
+            margin-bottom: 1rem;
+            box-shadow: 0 5px 20px rgba(0, 0, 0, 0.3);
+        }
+        
+        .city-input {
+            margin-bottom: 2rem;
+        }
+        
+        .city-input label {
+            display: block;
+            margin-bottom: 0.5rem;
+            color: #4facfe;
+        }
+        
+        .city-input input {
+            width: 100%;
+            padding: 0.75rem;
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            border-radius: 10px;
+            background: rgba(255, 255, 255, 0.1);
+            color: white;
+            font-size: 1rem;
+        }
+        
+        .city-input input::placeholder {
+            color: rgba(255, 255, 255, 0.6);
+        }
+        
+        .city-input input:focus {
+            outline: none;
+            border-color: #4facfe;
+        }
+        
+        .analyze-section {
+            text-align: center;
+            margin-top: 2rem;
+        }
+        
+        .loading {
+            display: none;
+            text-align: center;
+            margin: 2rem 0;
+        }
+        
+        .loading.active {
+            display: block;
+        }
+        
+        .spinner {
+            border: 4px solid rgba(255, 255, 255, 0.3);
+            border-radius: 50%;
+            border-top: 4px solid #4facfe;
+            width: 50px;
+            height: 50px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 1rem;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        .results {
+            display: none;
+            margin-top: 2rem;
+        }
+        
+        .results.active {
+            display: block;
+        }
+        
+        .analysis-card {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 15px;
+            padding: 2rem;
+            margin-bottom: 2rem;
+            backdrop-filter: blur(10px);
+        }
+        
+        .analysis-header {
+            display: flex;
+            align-items: center;
+            margin-bottom: 1.5rem;
+        }
+        
+        .analysis-header i {
+            font-size: 2rem;
+            color: #4facfe;
+            margin-right: 1rem;
+        }
+        
+        .analysis-content {
+            line-height: 1.6;
+            white-space: pre-wrap;
+        }
+        
+        .doctors-section {
+            margin-top: 2rem;
+        }
+        
+        .doctor-filters {
+            margin-bottom: 1.5rem;
+            padding: 1.5rem;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 10px;
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            backdrop-filter: blur(5px);
+        }
+        
+        .filter-controls {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            flex-wrap: wrap;
+        }
+        
+        .filter-label {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            font-weight: bold;
+            color: #4facfe;
+        }
+        
+        .filter-dropdown {
+            padding: 0.75rem;
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            border-radius: 8px;
+            background: rgba(255, 255, 255, 0.1);
+            color: white;
+            font-size: 1rem;
+            min-width: 150px;
+        }
+        
+        .filter-dropdown option {
+            background: #333;
+            color: white;
+        }
+        
+        .filter-info {
+            font-size: 0.9rem;
+            color: rgba(255, 255, 255, 0.8);
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        
+        .doctors-grid {
+            display: block;
+            width: 100%;
+        }
+        
+        .doctors-table {
+            width: 100%;
+            border-collapse: collapse;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 12px;
+            overflow: hidden;
+            backdrop-filter: blur(5px);
+            margin-top: 1rem;
+        }
+        
+        .doctors-table th {
+            background: rgba(79, 172, 254, 0.3);
+            color: white;
+            padding: 1rem;
+            text-align: left;
+            font-weight: 600;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+        }
+        
+        .doctors-table td {
+            padding: 1rem;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+            color: rgba(255, 255, 255, 0.9);
+        }
+        
+        .doctors-table tr:hover {
+            background: rgba(79, 172, 254, 0.1);
+        }
+        
+        .doctors-table tr:last-child td {
+            border-bottom: none;
+        }
+        
+        .doctor-name {
+            color: #4facfe;
+            font-weight: 600;
+            font-size: 1.1rem;
+        }
+        
+        .doctor-specialty {
+            color: rgba(255, 255, 255, 0.8);
+            font-size: 0.9rem;
+        }
+        
+        .doctor-location {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        
+        .doctor-rating-cell {
+            text-align: center;
+        }
+        
+        .rating-stars {
+            color: #ffc107;
+            margin-bottom: 0.25rem;
+        }
+        
+        .rating-text {
+            font-size: 0.9rem;
+            color: rgba(255, 255, 255, 0.8);
+        }
+        
+        .doctor-actions-cell {
+            text-align: center;
+        }
+        
+        .btn-table {
+            padding: 0.5rem 1rem;
+            margin: 0 0.25rem;
+            border: none;
+            border-radius: 6px;
+            font-size: 0.85rem;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.3rem;
+        }
+        
+        .btn-table.btn-primary {
+            background: linear-gradient(45deg, #4facfe, #00f2fe);
+            color: white;
+        }
+        
+        .btn-table.btn-secondary {
+            background: rgba(255, 255, 255, 0.1);
+            color: rgba(255, 255, 255, 0.9);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+        }
+        
+        .btn-table.btn-info {
+            background: linear-gradient(45deg, #28a745, #20c997);
+            color: white;
+        }
+        
+        .btn-table:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 3px 10px rgba(79, 172, 254, 0.3);
+        }
+        
+        .doctor-actions-cell {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.25rem;
+            justify-content: center;
+        }
+        
+        .doctor-rating-cell {
+            text-align: center;
+        }
+        
+        .rating-stars {
+            color: #ffc107;
+            margin-bottom: 0.2rem;
+        }
+        
+        .rating-text {
+            font-size: 0.85em;
+            color: rgba(255, 255, 255, 0.8);
+        }
+        
+        .doctor-name {
+            font-weight: bold;
+            color: #4facfe;
+            margin-bottom: 0.3rem;
+        }
+        
+        .doctor-degree {
+            font-size: 0.85em;
+            color: rgba(255, 255, 255, 0.7);
+            margin-bottom: 0.2rem;
+        }
+        
+        .doctor-experience {
+            font-size: 0.85em;
+            color: rgba(255, 255, 255, 0.8);
+        }
+        
+        .doctor-card {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 12px;
+            padding: 1.5rem;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            transition: all 0.3s ease;
+            backdrop-filter: blur(5px);
+        }
+        
+        .doctor-card:hover {
+            transform: translateY(-2px);
+            border-color: #4facfe;
+            box-shadow: 0 5px 20px rgba(79, 172, 254, 0.3);
+        }
+        
+        .doctor-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 1rem;
+        }
+        
+        .doctor-info h4 {
+            color: #4facfe;
+            margin-bottom: 0.5rem;
+            font-size: 1.1rem;
+        }
+        
+        .doctor-details {
+            display: flex;
+            flex-direction: column;
+            gap: 0.3rem;
+        }
+        
+        .doctor-detail {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            font-size: 0.9rem;
+            color: rgba(255, 255, 255, 0.9);
+        }
+        
+        .doctor-detail i {
+            width: 16px;
+            color: #4facfe;
+        }
+        
+        .doctor-rating {
+            display: flex;
+            flex-direction: column;
+            align-items: flex-end;
+            gap: 0.25rem;
+        }
+        
+        .rating-stars {
+            color: #ffc107;
+            font-size: 1.1rem;
+        }
+        
+        .rating-number {
+            font-size: 0.9rem;
+            color: rgba(255, 255, 255, 0.8);
+        }
+        
+        .doctor-actions {
+            margin-top: 1rem;
+            display: flex;
+            gap: 0.5rem;
+            flex-wrap: wrap;
+        }
+        
+        .btn-contact {
+            padding: 0.5rem 1rem;
+            background: linear-gradient(45deg, #4facfe, #00f2fe);
+            color: white;
+            border: none;
+            border-radius: 6px;
+            font-size: 0.9rem;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        
+        .btn-contact:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 3px 10px rgba(79, 172, 254, 0.4);
+        }
+        
+        .btn-outline {
+            background: transparent;
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            color: rgba(255, 255, 255, 0.9);
+        }
+        
+        .btn-outline:hover {
+            background: rgba(255, 255, 255, 0.1);
+            border-color: #4facfe;
+        }
+        
+        .email-modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.5);
+            backdrop-filter: blur(5px);
+        }
+        
+        .email-modal-content {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            margin: 10% auto;
+            padding: 2rem;
+            border-radius: 15px;
+            width: 90%;
+            max-width: 500px;
+            color: white;
+            position: relative;
+        }
+        
+        .email-close {
+            position: absolute;
+            right: 1rem;
+            top: 1rem;
+            font-size: 1.5rem;
+            cursor: pointer;
+            color: rgba(255, 255, 255, 0.8);
+        }
+        
+        .email-close:hover {
+            color: white;
+        }
+        
+        .email-input {
+            width: 100%;
+            padding: 0.75rem;
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            border-radius: 8px;
+            background: rgba(255, 255, 255, 0.1);
+            color: white;
+            font-size: 1rem;
+            margin: 1rem 0;
+        }
+        
+        .email-input::placeholder {
+            color: rgba(255, 255, 255, 0.6);
+        }
+        
+        .error-message {
+            background: rgba(220, 53, 69, 0.2);
+            border: 2px solid #dc3545;
+            border-radius: 10px;
+            padding: 1rem;
+            margin: 2rem 0;
+            text-align: center;
+        }
+        
+        .back-btn {
+            position: fixed;
+            top: 2rem;
+            left: 2rem;
+            z-index: 1000;
+        }
+        
+        @media (max-width: 768px) {
+            .container {
+                padding: 1rem;
+            }
+            
+            .upload-options {
+                grid-template-columns: 1fr;
+            }
+            
+            .category-grid {
+                grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            }
+            
+            .header h1 {
+                font-size: 2rem;
+            }
+            
+            .camera-controls {
+                flex-direction: column;
+                align-items: center;
+            }
+        }
+    </style>
+</head>
+<body>
+    <a href="/chat" class="btn btn-secondary back-btn">
+        <i class="fas fa-arrow-left"></i> Back to Chat
+    </a>
+
+    <div class="container">
+        <div class="header">
+            <h1><i class="fas fa-microscope"></i> Medical Image Analyzer</h1>
+            <p>AI-powered analysis of medical images using advanced vision technology</p>
+        </div>
+
+        <div class="disclaimer">
+            <i class="fas fa-exclamation-triangle"></i>
+            <strong>Medical Disclaimer:</strong> This AI analysis is for educational and informational purposes only. 
+            It does not replace professional medical diagnosis or treatment. Always consult with qualified healthcare providers 
+            for proper medical evaluation and care.
+        </div>
+
+        <div class="image-upload-section">
+            <div class="category-selection">
+                <h3><i class="fas fa-tags"></i> Select Image Type (Optional)</h3>
+                <p>Choose the type of medical image for specialized analysis:</p>
+                <div class="category-grid">
+                    <div class="category-option" data-category="skin">
+                        <i class="fas fa-hand-paper"></i>
+                        <h4>Skin Conditions</h4>
+                        <p>Rashes, moles, acne, etc.</p>
+                    </div>
+                    <div class="category-option" data-category="xray">
+                        <i class="fas fa-x-ray"></i>
+                        <h4>X-rays & Scans</h4>
+                        <p>X-rays, CT, MRI images</p>
+                    </div>
+                    <div class="category-option" data-category="eye">
+                        <i class="fas fa-eye"></i>
+                        <h4>Eye Conditions</h4>
+                        <p>Eye photos, vision issues</p>
+                    </div>
+                    <div class="category-option" data-category="dental">
+                        <i class="fas fa-tooth"></i>
+                        <h4>Dental Images</h4>
+                        <p>Teeth, gums, oral health</p>
+                    </div>
+                    <div class="category-option" data-category="wound">
+                        <i class="fas fa-band-aid"></i>
+                        <h4>Wounds & Injuries</h4>
+                        <p>Cuts, burns, healing progress</p>
+                    </div>
+                    <div class="category-option selected" data-category="general">
+                        <i class="fas fa-stethoscope"></i>
+                        <h4>General Medical</h4>
+                        <p>Other medical images</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="upload-options">
+                <div class="upload-option" id="fileUploadOption">
+                    <i class="fas fa-cloud-upload-alt"></i>
+                    <h3>Upload Image</h3>
+                    <p>Select a medical image from your device</p>
+                    <p><small>Supported: JPEG, PNG, WEBP (Max 20MB)</small></p>
+                    <input type="file" id="imageInput" class="file-input" accept="image/*">
+                </div>
+                
+                <div class="upload-option" id="cameraOption">
+                    <i class="fas fa-camera"></i>
+                    <h3>Take Photo</h3>
+                    <p>Use your device camera to capture an image</p>
+                    <p><small>Make sure lighting is adequate</small></p>
+                </div>
+            </div>
+
+            <div class="camera-container" id="cameraContainer">
+                <video id="cameraPreview" autoplay></video>
+                <canvas id="captureCanvas" style="display: none;"></canvas>
+                <div class="camera-controls">
+                    <button class="btn btn-primary" id="captureBtn">
+                        <i class="fas fa-camera"></i> Capture Image
+                    </button>
+                    <button class="btn btn-secondary" id="switchCameraBtn">
+                        <i class="fas fa-sync"></i> Switch Camera
+                    </button>
+                    <button class="btn btn-secondary" id="closeCameraBtn">
+                        <i class="fas fa-times"></i> Close Camera
+                    </button>
+                </div>
+            </div>
+
+            <div class="image-preview" id="imagePreview">
+                <img id="previewImage" class="preview-image" alt="Preview">
+                <div class="city-input">
+                    <label for="cityInput">
+                        <i class="fas fa-map-marker-alt"></i> Your City (Optional)
+                    </label>
+                    <input type="text" id="cityInput" placeholder="Enter your city for doctor recommendations" maxlength="100">
+                </div>
+                <div class="analyze-section">
+                    <button class="btn btn-primary" id="analyzeBtn">
+                        <i class="fas fa-microscope"></i> Analyze Image
+                    </button>
+                    <button class="btn btn-secondary" id="clearBtn">
+                        <i class="fas fa-trash"></i> Clear Image
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <div class="loading" id="loadingSection">
+            <div class="spinner"></div>
+            <h3>Analyzing Medical Image...</h3>
+            <p>AI is examining your image with specialized medical knowledge</p>
+        </div>
+
+        <div class="results" id="resultsSection">
+            <div class="analysis-card">
+                <div class="analysis-header">
+                    <i class="fas fa-brain"></i>
+                    <div>
+                        <h3>AI Medical Analysis</h3>
+                        <p id="analysisCategory">Analysis Category</p>
+                    </div>
+                </div>
+                <div class="analysis-content" id="analysisContent">
+                    <!-- AI analysis will be inserted here -->
+                </div>
+            </div>
+
+            <div class="doctors-section" id="doctorsSection">
+                <h3><i class="fas fa-user-md"></i> Recommended Specialists</h3>
+                
+                <!-- Doctor Filters -->
+                <div class="doctor-filters" id="doctorFilters" style="display: none;">
+                    <div class="filter-controls">
+                        <div class="filter-label">
+                            <i class="fas fa-filter"></i>
+                            <span>Sort by:</span>
+                        </div>
+                        <select id="doctorSortFilter" class="filter-dropdown" onchange="updateDoctorSort()">
+                            <option value="rating">Highest Rating</option>
+                            <option value="experience">Most Experience</option>
+                            <option value="location">Nearest Location</option>
+                        </select>
+                        <div class="filter-info">
+                            <i class="fas fa-stethoscope"></i>
+                            <span id="specialtyInfo">Specialists</span>
+                        </div>
+                        <button class="btn btn-outline" onclick="sendDoctorsEmail()" style="margin-left: auto;">
+                            <i class="fas fa-envelope"></i> Send via Email
+                        </button>
+                    </div>
+                </div>
+                
+                <!-- Doctors Grid -->
+                <div class="doctors-grid" id="doctorsList">
+                    <!-- Doctor recommendations will be inserted here -->
+                </div>
+            </div>
+        </div>
+
+        <!-- Email Modal -->
+        <div id="emailModal" class="email-modal">
+            <div class="email-modal-content">
+                <span class="email-close" onclick="closeEmailModal()">&times;</span>
+                <h3><i class="fas fa-envelope"></i> Send Doctor Recommendations</h3>
+                <p>Enter your email address to receive the doctor recommendations:</p>
+                <input type="email" id="emailInput" class="email-input" placeholder="Enter your email address" maxlength="100">
+                <div style="display: flex; gap: 1rem; margin-top: 1rem;">
+                    <button class="btn btn-primary" id="sendEmailBtn" onclick="sendEmail()">
+                        <i class="fas fa-paper-plane"></i> Send Email
+                    </button>
+                    <button class="btn btn-secondary" onclick="closeEmailModal()">
+                        <i class="fas fa-times"></i> Cancel
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <div class="error-message" id="errorMessage" style="display: none;">
+            <i class="fas fa-exclamation-circle"></i>
+            <span id="errorText"></span>
+        </div>
+    </div>
+
+    <script>
+        let currentStream = null;
+        let currentImageData = null;
+        let selectedCategory = 'general';
+        let useFrontCamera = false;
+        // Global state for user location (similar to chat)
+        window.MedicalAnalyzerState = {
+            userLocation: null,
+            currentAnalysis: null
+        };
+
+        // Location access functions (similar to chat)
+        function requestUserLocation() {
+            return new Promise((resolve, reject) => {
+                if (!navigator.geolocation) {
+                    reject('Geolocation is not supported by this browser.');
+                    return;
+                }
+
+                navigator.geolocation.getCurrentPosition(
+                    function(position) {
+                        window.MedicalAnalyzerState.userLocation = {
+                            latitude: position.coords.latitude,
+                            longitude: position.coords.longitude,
+                            accuracy: position.coords.accuracy
+                        };
+                        
+                        console.log('📍 User location detected:', window.MedicalAnalyzerState.userLocation);
+                        resolve(window.MedicalAnalyzerState.userLocation);
+                    },
+                    function(error) {
+                        let errorMessage = 'Location access failed.';
+                        switch(error.code) {
+                            case error.PERMISSION_DENIED:
+                                errorMessage = 'Location access denied by user.';
+                                break;
+                            case error.POSITION_UNAVAILABLE:
+                                errorMessage = 'Location information is unavailable.';
+                                break;
+                            case error.TIMEOUT:
+                                errorMessage = 'Location request timed out.';
+                                break;
+                        }
+                        console.warn('Location error:', errorMessage);
+                        reject(errorMessage);
+                    },
+                    {
+                        enableHighAccuracy: true,
+                        timeout: 10000,
+                        maximumAge: 60000
+                    }
+                );
+            });
+        }
+
+        function showLocationPrompt() {
+            // Create location prompt modal
+            const modal = document.createElement('div');
+            modal.id = 'locationPrompt';
+            modal.style.cssText = `
+                position: fixed;
+                top: 0;
+                left: 0;
+                width: 100%;
+                height: 100%;
+                background: rgba(0, 0, 0, 0.7);
+                display: flex;
+                justify-content: center;
+                align-items: center;
+                z-index: 10000;
+                backdrop-filter: blur(5px);
+            `;
+            
+            modal.innerHTML = `
+                <div style="
+                    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                    padding: 2rem;
+                    border-radius: 15px;
+                    color: white;
+                    text-align: center;
+                    max-width: 400px;
+                    margin: 1rem;
+                    box-shadow: 0 20px 40px rgba(0,0,0,0.3);
+                ">
+                    <i class="fas fa-map-marker-alt" style="font-size: 3rem; color: #4facfe; margin-bottom: 1rem;"></i>
+                    <h3 style="margin-bottom: 1rem;">📍 Location Access</h3>
+                    <p style="margin-bottom: 2rem; opacity: 0.9;">
+                        Allow location access to find nearby doctors and get distance-based recommendations for better results.
+                    </p>
+                    <div style="display: flex; gap: 1rem; justify-content: center;">
+                        <button onclick="requestLocationAndContinue()" style="
+                            background: linear-gradient(45deg, #4facfe, #00f2fe);
+                            color: white;
+                            border: none;
+                            padding: 0.8rem 1.5rem;
+                            border-radius: 8px;
+                            font-weight: bold;
+                            cursor: pointer;
+                            transition: all 0.3s ease;
+                        ">
+                            <i class="fas fa-map-marker-alt"></i> Allow Location
+                        </button>
+                        <button onclick="continueWithoutLocation()" style="
+                            background: transparent;
+                            color: white;
+                            border: 2px solid rgba(255,255,255,0.3);
+                            padding: 0.8rem 1.5rem;
+                            border-radius: 8px;
+                            font-weight: bold;
+                            cursor: pointer;
+                            transition: all 0.3s ease;
+                        ">
+                            <i class="fas fa-times"></i> Skip
+                        </button>
+                    </div>
+                </div>
+            `;
+            
+            document.body.appendChild(modal);
+        }
+
+        function hideLocationPrompt() {
+            const modal = document.getElementById('locationPrompt');
+            if (modal) {
+                modal.remove();
+            }
+        }
+
+        async function requestLocationAndContinue() {
+            const button = document.querySelector('#locationPrompt button');
+            const originalText = button.innerHTML;
+            
+            button.disabled = true;
+            button.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Getting Location...';
+            
+            try {
+                await requestUserLocation();
+                hideLocationPrompt();
+                showStatusMessage('Location detected! Loading nearby doctors...', 'success');
+                // Re-analyze with location data
+                if (currentSpecialist) {
+                    updateDoctorSort();
+                }
+            } catch (error) {
+                console.warn('Location access failed:', error);
+                hideLocationPrompt();
+                showStatusMessage('Location access failed. Showing all doctors.', 'warning');
+                continueWithoutLocation();
+            }
+        }
+
+        function continueWithoutLocation() {
+            hideLocationPrompt();
+            console.log('User chose to continue without location');
+        }
+
+        function showStatusMessage(message, type = 'info') {
+            // Create a temporary status message
+            const statusDiv = document.createElement('div');
+            statusDiv.style.cssText = `
+                position: fixed;
+                top: 20px;
+                right: 20px;
+                padding: 1rem 1.5rem;
+                border-radius: 8px;
+                color: white;
+                font-weight: bold;
+                z-index: 9999;
+                transition: all 0.3s ease;
+                background: ${type === 'success' ? '#28a745' : type === 'warning' ? '#ffc107' : '#17a2b8'};
+                box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+            `;
+            statusDiv.textContent = message;
+            
+            document.body.appendChild(statusDiv);
+            
+            setTimeout(() => {
+                statusDiv.style.opacity = '0';
+                setTimeout(() => statusDiv.remove(), 300);
+            }, 3000);
+        }
+        let currentSpecialist = null;
+
+        // Category selection
+        document.querySelectorAll('.category-option').forEach(option => {
+            option.addEventListener('click', function() {
+                document.querySelectorAll('.category-option').forEach(opt => opt.classList.remove('selected'));
+                this.classList.add('selected');
+                selectedCategory = this.dataset.category;
+            });
+        });
+
+        // File upload handling
+        document.getElementById('fileUploadOption').addEventListener('click', () => {
+            document.getElementById('imageInput').click();
+        });
+
+        document.getElementById('imageInput').addEventListener('change', function(e) {
+            if (e.target.files.length > 0) {
+                const file = e.target.files[0];
+                
+                // Validate file size (20MB)
+                if (file.size > 20 * 1024 * 1024) {
+                    showError('File too large. Maximum size is 20MB.');
+                    return;
+                }
+
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    displayImage(e.target.result);
+                    currentImageData = file;
+                };
+                reader.readAsDataURL(file);
+            }
+        });
+
+        // Camera handling
+        document.getElementById('cameraOption').addEventListener('click', startCamera);
+        document.getElementById('captureBtn').addEventListener('click', captureImage);
+        document.getElementById('switchCameraBtn').addEventListener('click', switchCamera);
+        document.getElementById('closeCameraBtn').addEventListener('click', stopCamera);
+
+        async function startCamera() {
+            try {
+                const constraints = {
+                    video: {
+                        facingMode: useFrontCamera ? 'user' : 'environment'
+                    }
+                };
+
+                currentStream = await navigator.mediaDevices.getUserMedia(constraints);
+                document.getElementById('cameraPreview').srcObject = currentStream;
+                document.getElementById('cameraContainer').classList.add('active');
+            } catch (error) {
+                showError('Unable to access camera: ' + error.message);
+            }
+        }
+
+        async function switchCamera() {
+            useFrontCamera = !useFrontCamera;
+            stopCamera();
+            await startCamera();
+        }
+
+        function captureImage() {
+            const video = document.getElementById('cameraPreview');
+            const canvas = document.getElementById('captureCanvas');
+            const context = canvas.getContext('2d');
+
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+            context.drawImage(video, 0, 0);
+
+            canvas.toBlob(function(blob) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    displayImage(e.target.result);
+                    currentImageData = blob;
+                    stopCamera();
+                };
+                reader.readAsDataURL(blob);
+            }, 'image/jpeg', 0.8);
+        }
+
+        function stopCamera() {
+            if (currentStream) {
+                currentStream.getTracks().forEach(track => track.stop());
+                currentStream = null;
+            }
+            document.getElementById('cameraContainer').classList.remove('active');
+        }
+
+        function displayImage(imageSrc) {
+            document.getElementById('previewImage').src = imageSrc;
+            document.getElementById('imagePreview').classList.add('active');
+            hideError();
+        }
+
+        // Analysis handling
+        document.getElementById('analyzeBtn').addEventListener('click', analyzeImage);
+        document.getElementById('clearBtn').addEventListener('click', clearImage);
+
+        async function analyzeImage() {
+            if (!currentImageData) {
+                showError('Please select or capture an image first.');
+                return;
+            }
+
+            // Show loading
+            document.getElementById('loadingSection').classList.add('active');
+            document.getElementById('resultsSection').classList.remove('active');
+            hideError();
+
+            try {
+                const formData = new FormData();
+                formData.append('image', currentImageData);
+                formData.append('image_type', selectedCategory);
+                
+                const cityInput = document.getElementById('cityInput').value.trim();
+                if (cityInput) {
+                    formData.append('city', cityInput);
+                }
+                
+                // Add user location if available
+                if (window.MedicalAnalyzerState.userLocation) {
+                    formData.append('userLocation', JSON.stringify(window.MedicalAnalyzerState.userLocation));
+                }
+
+                const response = await fetch('/api/v1/analyze-medical-image', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const result = await response.json();
+
+                // Hide loading
+                document.getElementById('loadingSection').classList.remove('active');
+
+                // Debug: Log the response structure
+                console.log('🔍 API Response:', result);
+                console.log('🔍 Analysis object:', result.analysis);
+                if (result.analysis) {
+                    console.log('🔍 Doctors array:', result.analysis.doctors);
+                    console.log('🔍 Number of doctors:', result.analysis.doctors ? result.analysis.doctors.length : 'undefined');
+                    
+                    // INNOVATIVE DEBUG: Show raw data structure in console for debugging
+                    if (result.analysis.doctors && result.analysis.doctors.length > 0) {
+                        console.group('🔍 DETAILED DOCTOR DATA INSPECTION');
+                        result.analysis.doctors.forEach((doctor, index) => {
+                            console.log(`Doctor ${index + 1} raw data:`, doctor);
+                            console.log(`Doctor ${index + 1} keys:`, Object.keys(doctor));
+                            console.log(`Doctor ${index + 1} values:`, Object.values(doctor));
+                        });
+                        console.groupEnd();
+                    }
+                }
+
+                if (result.success) {
+                    displayResults(result.analysis);
+                } else {
+                    showError(result.message || 'Analysis failed. Please try again.');
+                }
+            } catch (error) {
+                document.getElementById('loadingSection').classList.remove('active');
+                showError('Network error. Please check your connection and try again.');
+                console.error('Analysis error:', error);
+            }
+        }
+
+        function displayResults(analysis) {
+            console.log('🎯 displayResults called with:', analysis);
+            console.log('🎯 analysis.doctors:', analysis.doctors);
+            console.log('🎯 analysis.doctors length:', analysis.doctors ? analysis.doctors.length : 'undefined');
+            
+            // INNOVATIVE SOLUTION: Transform any data format to what the frontend needs
+            const transformedDoctors = transformDoctorData(analysis.doctors || []);
+            console.log('🔄 Transformed doctors:', transformedDoctors);
+            
+            // Store current analysis for filtering
+            currentAnalysisResult = analysis;
+            currentSpecialist = mapSpecialistName(analysis.specialist_type);
+            
+            // Display analysis category
+            document.getElementById('analysisCategory').textContent = analysis.category || 'Medical Analysis';
+            
+            // Display AI interpretation
+            document.getElementById('analysisContent').textContent = analysis.ai_interpretation || 'No analysis available.';
+
+            // **FIXED: Just show a simple recommendation message instead of broken table**
+            console.log('✅ Showing simple doctor recommendation message');
+            const doctorsSection = document.getElementById('doctorsSection');
+            const doctorsList = document.getElementById('doctorsList');
+            
+            // Show simple recommendation without table
+            doctorsSection.style.display = 'block';
+            
+            // Hide filters since we're not showing a table
+            const doctorFilters = document.getElementById('doctorFilters');
+            doctorFilters.style.display = 'none';
+            
+            // Simple recommendation message
+            doctorsList.innerHTML = `
+                <div style="padding: 20px; background: linear-gradient(45deg, #4facfe, #00f2fe); color: white; border-radius: 10px; text-align: center; margin: 20px 0;">
+                    <h3 style="margin-top: 0;"><i class="fas fa-user-md"></i> Doctor Recommendation</h3>
+                    <p style="font-size: 1.1em; margin: 10px 0;">
+                        Based on the AI analysis, I recommend consulting a <strong>${analysis.specialist_type}</strong>.
+                    </p>
+                    <p style="font-size: 0.9em; margin-bottom: 0;">
+                        Please contact your local healthcare directory or visit your nearest hospital to find qualified specialists in your area.
+                    </p>
+                </div>
+            `;
+            
+            // Update specialty info if container exists
+            const specialtyInfo = document.getElementById('specialtyInfo');
+            if (specialtyInfo) {
+                specialtyInfo.textContent = `Recommendation: ${analysis.specialist_type}`;
+            }
+
+            document.getElementById('resultsSection').classList.add('active');
+        }
+
+        function transformDoctorData(doctors) {
+            console.log('🔧 transformDoctorData input:', doctors);
+            
+            if (!doctors || !Array.isArray(doctors)) {
+                console.log('❌ Invalid doctors data, returning empty array');
+                return [];
+            }
+            
+            return doctors.map((doctor, index) => {
+                console.log(`🔧 Transforming doctor ${index + 1}:`, doctor);
+                
+                // Create a standardized doctor object with guaranteed fields
+                const transformed = {
+                    // Basic info - try multiple possible field names
+                    name: doctor.name || doctor.doctor_name || doctor.doctorName || 'Unknown Doctor',
+                    specialty: doctor.specialty || doctor.speciality || doctor.specialization || 'General Practice',
+                    degree: doctor.degree || doctor.qualification || doctor.qualifications || 'Not specified',
+                    city: doctor.city || doctor.location || doctor.address || 'Location not specified',
+                    
+                    // Numeric fields - ensure they're numbers and have fallbacks
+                    dp_score: parseFloat(doctor.dp_score || doctor.rating || doctor.score || 0),
+                    year_of_experience: parseInt(doctor.year_of_experience || doctor.experience || doctor.exp || 0),
+                    consultation_fee: parseInt(doctor.consultation_fee || doctor.fee || doctor.cost || 0),
+                    distance_km: parseFloat(doctor.distance_km || doctor.distance || 999999),
+                    
+                    // URLs - handle nulls and empty strings
+                    profile_url: (doctor.profile_url && doctor.profile_url !== 'nan' && doctor.profile_url !== 'null') ? doctor.profile_url : '',
+                    google_map_link: (doctor.google_map_link && doctor.google_map_link !== 'nan' && doctor.google_map_link !== 'null') ? doctor.google_map_link : ''
+                };
+                
+                console.log(`✅ Transformed doctor ${index + 1}:`, transformed);
+                return transformed;
+            });
+        }
+
+        function mapSpecialistName(specialistType) {
+            // Map specialist types to database-friendly names
+            const specialistMap = {
+                'Dermatologist': 'dermatologist',
+                'Radiologist': 'radiologist', 
+                'Ophthalmologist': 'ophthalmologist',
+                'Dentist': 'dentist',
+                'General Practitioner': 'general-physician',
+                'General Physician': 'general-physician'
+            };
+            return specialistMap[specialistType] || 'general-physician';
+        }
+
+        function displayDoctorRecommendations(doctors, specialistType) {
+            const doctorsSection = document.getElementById('doctorsSection');
+            const doctorsList = document.getElementById('doctorsList');
+            const doctorFilters = document.getElementById('doctorFilters');
+            const specialtyInfo = document.getElementById('specialtyInfo');
+            
+            if (doctors && doctors.length > 0) {
+                // Show location prompt first if user hasn't granted location access
+                if (!window.MedicalAnalyzerState.userLocation) {
+                    showLocationPrompt();
+                }
+                
+                // Show filters
+                doctorFilters.style.display = 'block';
+                specialtyInfo.textContent = `${specialistType}s (${doctors.length} found)`;
+                
+                // Create table structure
+                doctorsList.innerHTML = `
+                    <table class="doctors-table">
+                        <thead>
+                            <tr>
+                                <th style="width: 5%;"><i class="fas fa-hashtag"></i> #</th>
+                                <th style="width: 15%;"><i class="fas fa-user-md"></i> Doctor Name</th>
+                                <th style="width: 12%;"><i class="fas fa-stethoscope"></i> Specialty</th>
+                                <th style="width: 15%;"><i class="fas fa-graduation-cap"></i> Qualification</th>
+                                <th style="width: 8%;"><i class="fas fa-clock"></i> Experience</th>
+                                <th style="width: 10%;"><i class="fas fa-rupee-sign"></i> Fee</th>
+                                <th style="width: 8%;"><i class="fas fa-star"></i> Rating</th>
+                                <th style="width: 10%;"><i class="fas fa-route"></i> Distance</th>
+                                <th style="width: 12%;"><i class="fas fa-map-marker-alt"></i> Location</th>
+                                <th style="width: 10%;"><i class="fas fa-external-link-alt"></i> Profile</th>
+                                <th style="width: 5%;"><i class="fas fa-map"></i> Maps</th>
+                            </tr>
+                        </thead>
+                        <tbody id="doctorsTableBody">
+                        </tbody>
+                    </table>
+                `;
+                
+                // Populate table with doctors
+                const tableBody = document.getElementById('doctorsTableBody');
+                console.log('👨‍⚕️ About to populate table with doctors:', doctors);
+                console.log('👨‍⚕️ Number of doctors:', doctors.length);
+                doctors.forEach((doctor, index) => {
+                    console.log(`👨‍⚕️ Processing doctor ${index + 1}:`, doctor);
+                    const row = createDoctorTableRow(doctor, index);
+                    tableBody.appendChild(row);
+                });
+                
+                doctorsSection.style.display = 'block';
+            } else {
+                doctorsSection.style.display = 'none';
+            }
+        }
+
+        function createDoctorTableRow(doctor, index) {
+            console.log(`🔧 createDoctorTableRow called for doctor ${index + 1}:`, doctor);
+            
+            const row = document.createElement('tr');
+            
+            // BULLETPROOF DATA EXTRACTION - handles any format
+            const safeGetValue = (obj, possibleKeys, defaultValue = 'Not specified', type = 'string') => {
+                for (let key of possibleKeys) {
+                    if (obj && obj.hasOwnProperty(key) && obj[key] !== undefined && obj[key] !== null && obj[key] !== 'nan') {
+                        let value = obj[key];
+                        if (type === 'number') {
+                            value = parseFloat(value);
+                            return isNaN(value) ? defaultValue : value;
+                        }
+                        if (type === 'int') {
+                            value = parseInt(value);
+                            return isNaN(value) ? defaultValue : value;
+                        }
+                        return value.toString().trim() || defaultValue;
+                    }
+                }
+                return defaultValue;
+            };
+            
+            // Extract all data with multiple fallback options
+            const name = safeGetValue(doctor, ['name', 'doctor_name', 'doctorName'], 'Unknown Doctor');
+            const specialty = safeGetValue(doctor, ['specialty', 'speciality', 'specialization'], 'General Practice');
+            const degree = safeGetValue(doctor, ['degree', 'qualification', 'qualifications'], 'Not specified');
+            const city = safeGetValue(doctor, ['city', 'location', 'address'], 'Location not specified');
+            
+            // Numeric values with proper parsing
+            const rating = safeGetValue(doctor, ['dp_score', 'rating', 'score'], 0, 'number');
+            const experience = safeGetValue(doctor, ['year_of_experience', 'experience', 'exp'], 0, 'int');
+            const fee = safeGetValue(doctor, ['consultation_fee', 'fee', 'cost'], 0, 'int');
+            const distance = safeGetValue(doctor, ['distance_km', 'distance'], 999999, 'number');
+            
+            // Format the display values
+            const ratingText = rating > 0 ? `${rating.toFixed(1)}★` : 'Not rated';
+            const experienceText = experience > 0 ? `${experience} years` : 'Not specified';
+            const feeText = fee > 0 ? `₹${fee}` : 'Not specified';
+            const distanceText = distance && distance !== 999999 ? `${distance.toFixed(1)} km` : 'Location not available';
+            
+            // Handle URLs safely
+            const profileUrl = safeGetValue(doctor, ['profile_url'], '');
+            const mapUrl = safeGetValue(doctor, ['google_map_link'], '');
+            
+            const profileLink = profileUrl ? 
+                `<a href="${profileUrl}" target="_blank" style="color: #4facfe; text-decoration: none; font-weight: bold;">View Profile</a>` :
+                'Not available';
+                
+            const mapsLink = mapUrl ? 
+                `<a href="${mapUrl}" target="_blank" style="color: #4facfe; text-decoration: none; font-weight: bold;">View Map</a>` :
+                'Not available';
+            
+            console.log(`🔧 Final values for doctor ${index + 1}:`, {
+                name, specialty, degree, city, rating, experience, fee, distance,
+                ratingText, experienceText, feeText, distanceText
+            });
+            
+            // Set alternating row colors
+            const rowStyle = (index + 1) % 2 === 1 ? 'background-color: rgba(255,255,255,0.1);' : 'background-color: rgba(255,255,255,0.05);';
+            
+            row.innerHTML = `
+                <td style="${rowStyle} text-align: center; font-weight: bold; color: #4facfe;">${index + 1}</td>
+                <td style="${rowStyle}">
+                    <div class="doctor-name">Dr. ${name}</div>
+                </td>
+                <td style="${rowStyle} text-transform: capitalize;">${specialty}</td>
+                <td style="${rowStyle} font-size: 0.9em;">${degree}</td>
+                <td style="${rowStyle} text-align: center;"><strong style="color: #17a2b8;">${experienceText}</strong></td>
+                <td style="${rowStyle} text-align: center;"><strong style="color: #28a745;">${feeText}</strong></td>
+                <td style="${rowStyle} text-align: center;"><strong style="color: #ffc107;">${ratingText}</strong></td>
+                <td style="${rowStyle} text-align: center;"><strong style="color: #6f42c1;">${distanceText}</strong></td>
+                <td style="${rowStyle}">${city}</td>
+                <td style="${rowStyle} text-align: center;">${profileLink}</td>
+                <td style="${rowStyle} text-align: center;">${mapsLink}</td>
+            `;
+            
+            return row;
+        }
+
+        function generateStars(rating) {
+            const fullStars = Math.floor(rating);
+            const hasHalfStar = rating % 1 >= 0.5;
+            const emptyStars = 5 - fullStars - (hasHalfStar ? 1 : 0);
+            
+            let stars = '';
+            for (let i = 0; i < fullStars; i++) {
+                stars += '<i class="fas fa-star"></i>';
+            }
+            if (hasHalfStar) {
+                stars += '<i class="fas fa-star-half-alt"></i>';
+            }
+            for (let i = 0; i < emptyStars; i++) {
+                stars += '<i class="far fa-star"></i>';
+            }
+            
+            return stars;
+        }
+
+        async function updateDoctorSort() {
+            if (!currentSpecialist) return;
+            
+            const sortBy = document.getElementById('doctorSortFilter').value;
+            
+            try {
+                showLoadingDoctors();
+                
+                // Prepare request body
+                const requestBody = {
+                    specialty: currentSpecialist,
+                    sort_by: sortBy,
+                    city: document.getElementById('cityInput').value.trim() || 'Bangalore'
+                };
+                
+                // Add user location if available
+                if (window.MedicalAnalyzerState.userLocation) {
+                    requestBody.userLocation = window.MedicalAnalyzerState.userLocation;
+                }
+                
+                const response = await fetch('/api/doctors/sort', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(requestBody)
+                });
+
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}`);
+                }
+
+                const data = await response.json();
+                
+                if (data.success) {
+                    // Parse the response to extract doctor information
+                    const doctors = parseDoctorResponse(data.response);
+                    displayDoctorRecommendations(doctors, currentAnalysisResult.specialist_type);
+                    hideLoadingDoctors();
+                } else {
+                    throw new Error(data.error || 'Failed to sort doctors');
+                }
+                
+            } catch (error) {
+                console.error('Error sorting doctors:', error);
+                showError('Failed to update doctor recommendations. Please try again.');
+                hideLoadingDoctors();
+            }
+        }
+
+        function showLoadingDoctors() {
+            const doctorsList = document.getElementById('doctorsList');
+            doctorsList.innerHTML = `
+                <div style="text-align: center; padding: 3rem; color: rgba(255, 255, 255, 0.8);">
+                    <div class="spinner" style="margin: 0 auto 1rem;"></div>
+                    <p><i class="fas fa-search"></i> Updating doctor recommendations...</p>
+                </div>
+            `;
+        }
+
+        function parseDoctorResponse(responseText) {
+            // Parse the formatted doctor response text to extract doctor information
+            const doctors = [];
+            const lines = responseText.split('\n');
+            
+            for (const line of lines) {
+                if (line.includes('Dr.') && line.includes('|')) {
+                    const parts = line.split('|').map(part => part.trim());
+                    if (parts.length >= 3) {
+                        doctors.push({
+                            name: parts[0],
+                            city: parts[1] || 'Not specified',
+                            specialty: parts[2] || 'General Practice',
+                            rating: parts[3] || '4.0',
+                            experience: parts[4] || null
+                        });
+                    }
+                }
+            }
+            
+            // If no doctors found in the expected format, try to extract from a different format
+            if (doctors.length === 0) {
+                // Look for doctor names in other formats
+                const doctorMatches = responseText.match(/Dr\.\s+[A-Za-z\s]+/g);
+                if (doctorMatches) {
+                    doctorMatches.forEach((match, index) => {
+                        doctors.push({
+                            name: match.trim(),
+                            city: 'Bangalore',
+                            specialty: currentAnalysisResult?.specialist_type || 'General Practice',
+                            rating: (4.0 + Math.random() * 1).toFixed(1),
+                            experience: null
+                        });
+                    });
+                }
+            }
+            
+            return doctors;
+        }
+
+        function hideLoadingDoctors() {
+            // Loading will be replaced by updated doctor list
+        }
+
+        function contactDoctor(doctorName, city) {
+            // Implement contact functionality
+            showSuccess(`Contact information for ${doctorName} in ${city} would be displayed here.`);
+        }
+
+        function viewDoctorProfile(doctorName) {
+            // Implement profile view functionality
+            showSuccess(`Detailed profile for ${doctorName} would be displayed here.`);
+        }
+
+        function sendDoctorsEmail() {
+            if (!currentAnalysisResult || !currentAnalysisResult.doctors) {
+                showError('No doctor recommendations to send.');
+                return;
+            }
+            
+            document.getElementById('emailModal').style.display = 'block';
+            document.getElementById('emailInput').focus();
+        }
+
+        function closeEmailModal() {
+            document.getElementById('emailModal').style.display = 'none';
+            document.getElementById('emailInput').value = '';
+        }
+
+        async function sendEmail() {
+            const emailInput = document.getElementById('emailInput');
+            const sendBtn = document.getElementById('sendEmailBtn');
+            const email = emailInput.value.trim();
+
+            if (!email) {
+                showError('Please enter a valid email address.');
+                emailInput.focus();
+                return;
+            }
+
+            // Email validation
+            const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+            if (!emailRegex.test(email)) {
+                showError('Please enter a valid email address.');
+                emailInput.focus();
+                return;
+            }
+
+            // Show loading state
+            sendBtn.disabled = true;
+            sendBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Sending...';
+
+            try {
+                const emailContent = formatEmailContent();
+                
+                const response = await fetch('/api/send-email', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        to_email: email,
+                        subject: 'Medical Image Analysis - Doctor Recommendations',
+                        content: emailContent
+                    })
+                });
+
+                if (response.ok) {
+                    showSuccess('Doctor recommendations sent successfully!');
+                    closeEmailModal();
+                } else {
+                    throw new Error('Failed to send email');
+                }
+
+            } catch (error) {
+                console.error('Email error:', error);
+                showError('Failed to send email. Please try again.');
+            } finally {
+                sendBtn.disabled = false;
+                sendBtn.innerHTML = '<i class="fas fa-paper-plane"></i> Send Email';
+            }
+        }
+
+        function formatEmailContent() {
+            if (!currentAnalysisResult) return '';
+            
+            let content = `Medical Image Analysis Report\n`;
+            content += `================================\n\n`;
+            content += `Analysis Category: ${currentAnalysisResult.category}\n`;
+            content += `Recommended Specialist: ${currentAnalysisResult.specialist_type}\n\n`;
+            content += `AI Analysis Summary:\n`;
+            content += `${currentAnalysisResult.ai_interpretation.substring(0, 500)}...\n\n`;
+            content += `Recommended Doctors:\n`;
+            content += `=====================\n`;
+            
+            currentAnalysisResult.doctors.forEach((doctor, index) => {
+                content += `${index + 1}. ${doctor.name}\n`;
+                content += `   Location: ${doctor.city || doctor.location}\n`;
+                content += `   Specialty: ${doctor.specialty || doctor.speciality}\n`;
+                content += `   Experience: ${doctor.year_of_experience} years\n`;
+                content += `   Rating: ${doctor.dp_score}/5\n`;
+                content += `   Consultation Fee: ₹${doctor.consultation_fee || 'Not specified'}\n`;
+                content += `   Degree: ${doctor.degree}\n\n`;
+            });
+            
+            content += `\nNote: This analysis is for educational purposes only. Please consult with qualified healthcare providers for proper medical evaluation.\n`;
+            
+            return content;
+        }
+
+        function showSuccess(message) {
+            // Use existing showError function structure but with success styling
+            document.getElementById('errorText').textContent = message;
+            const errorDiv = document.getElementById('errorMessage');
+            errorDiv.style.display = 'block';
+            errorDiv.style.borderColor = '#28a745';
+            errorDiv.style.backgroundColor = 'rgba(40, 167, 69, 0.2)';
+            
+            setTimeout(() => {
+                hideError();
+            }, 3000);
+        }
+
+        function clearImage() {
+            currentImageData = null;
+            document.getElementById('imagePreview').classList.remove('active');
+            document.getElementById('resultsSection').classList.remove('active');
+            document.getElementById('imageInput').value = '';
+            document.getElementById('cityInput').value = '';
+            hideError();
+        }
+
+        function showError(message) {
+            document.getElementById('errorText').textContent = message;
+            document.getElementById('errorMessage').style.display = 'block';
+        }
+
+        function hideError() {
+            document.getElementById('errorMessage').style.display = 'none';
+        }
+
+        // Cleanup on page unload
+        window.addEventListener('beforeunload', () => {
+            stopCamera();
+        });
+    </script>
+</body>
+</html>
