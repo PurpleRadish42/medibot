@@ -281,12 +281,12 @@ class MedicalRecommender:
                     "role": "system", 
                     "content": "Greet the patient warmly and ask ONE question about their primary health concern. Keep it conversational and caring."
                 })
-            elif conversation_state["message_count"] < 5 and not conversation_state["recommendation_made"]:
+            elif conversation_state["message_count"] < 3 and not conversation_state["recommendation_made"]:
                 messages.append({
                     "role": "system", 
                     "content": "Based on what the patient just told you, ask ONE relevant follow-up question to better understand their symptoms. Focus on duration, severity, associated symptoms, or impact on daily life. Be conversational and empathetic."
                 })
-            elif conversation_state["message_count"] >= 5 and not conversation_state["recommendation_made"]:
+            elif conversation_state["message_count"] >= 3 and not conversation_state["recommendation_made"]:
                 messages.append({
                     "role": "system", 
                     "content": "You have gathered enough information. Now provide a clear recommendation for which ONE specialist the patient should see based on their symptoms. End your response with: 'SPECIALIST_RECOMMENDATION: [SPECIALIST_TYPE]'"
@@ -315,13 +315,21 @@ class MedicalRecommender:
                 # Remove the specialist recommendation line from response
                 ai_response = re.sub(r"SPECIALIST_RECOMMENDATION:.*", "", ai_response, flags=re.IGNORECASE).strip()
                 
-                # Instead of automatically showing doctors, ask if they want to see them
-                doctor_prompt = f"\n\nWould you like me to show you a list of qualified {specialist_type}s in your area? I can help you find doctors based on location or ratings."
-                
-                final_response = ai_response + doctor_prompt
-                
-                logger.info(f"Made specialist recommendation: {specialist_type}")
-                return final_response
+                # Automatically show doctor recommendations
+                try:
+                    doctor_recommendations = self.get_doctor_recommendations(
+                        specialist_type, 
+                        user_city, 
+                        sort_by="ratings"
+                    )
+                    
+                    final_response = ai_response + "\n\n" + doctor_recommendations
+                    logger.info(f"Made specialist recommendation: {specialist_type} with doctor list")
+                    return final_response
+                except Exception as e:
+                    logger.error(f"Error getting doctor recommendations: {e}")
+                    # Fallback to just the AI response
+                    return ai_response
             
             return ai_response
             

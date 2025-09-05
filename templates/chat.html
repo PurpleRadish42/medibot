@@ -258,6 +258,7 @@
             box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
             word-wrap: break-word;
             line-height: 1.6;
+            overflow-x: auto;
         }
 
         .message.user .message-content {
@@ -559,6 +560,9 @@
             border-radius: 8px;
             overflow: hidden;
             box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            width: 100%;
+            min-width: 600px;
+            table-layout: auto;
         }
 
         .message.bot table th {
@@ -590,12 +594,18 @@
                 display: block;
                 overflow-x: auto;
                 white-space: nowrap;
+                min-width: 500px;
             }
             
             .message.bot table th,
             .message.bot table td {
                 padding: 6px 4px !important;
                 font-size: 0.7rem;
+            }
+            
+            .message-content {
+                overflow-x: auto;
+                padding: 0.5rem 1rem;
             }
         }
 

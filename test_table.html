@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Doctor Recommendations Test</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .test-container {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(15px);
+            border-radius: 15px;
+            padding: 20px;
+            margin: 20px 0;
+        }
+        .message {
+            background: rgba(255, 255, 255, 0.9);
+            border-radius: 15px;
+            padding: 20px;
+            margin: 20px 0;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+        .message.bot table {
+            font-size: 0.9rem;
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+        .message.bot table th {
+            font-size: 0.85rem;
+            padding: 8px 6px !important;
+            white-space: nowrap;
+        }
+        .message.bot table td {
+            padding: 8px 6px !important;
+            font-size: 0.8rem;
+            vertical-align: top;
+        }
+        .message.bot table a {
+            color: #4facfe !important;
+            text-decoration: none;
+            font-weight: 500;
+        }
+        .message.bot table a:hover {
+            text-decoration: underline;
+        }
+    </style>
+</head>
+<body>
+    <div class="test-container">
+        <h1>Doctor Recommendations Test</h1>
+        <p>This page tests if the doctor recommendation table displays correctly.</p>
+        
+        <div class="message bot">
+            <p>Based on your symptoms, I recommend consulting a <strong>Cardiologist</strong>. Here are 3 qualified doctors I found:</p>
+            
+            <table style="border-collapse: collapse; width: 100%; margin: 20px 0; font-family: Arial, sans-serif; background: rgba(255, 255, 255, 0.9); border-radius: 8px; overflow: hidden;">
+                <thead>
+                    <tr style="background: linear-gradient(45deg, #4facfe, #00f2fe); color: white; border-bottom: 2px solid #dee2e6;">
+                        <th style="border: 1px solid #dee2e6; padding: 12px; text-align: left; font-weight: bold;">#</th>
+                        <th style="border: 1px solid #dee2e6; padding: 12px; text-align: left; font-weight: bold;">Doctor Name</th>
+                        <th style="border: 1px solid #dee2e6; padding: 12px; text-align: left; font-weight: bold;">Specialty</th>
+                        <th style="border: 1px solid #dee2e6; padding: 12px; text-align: left; font-weight: bold;">Qualification</th>
+                        <th style="border: 1px solid #dee2e6; padding: 12px; text-align: left; font-weight: bold;">Location</th>
+                        <th style="border: 1px solid #dee2e6; padding: 12px; text-align: left; font-weight: bold;">DP Score</th>
+                        <th style="border: 1px solid #dee2e6; padding: 12px; text-align: left; font-weight: bold;">Profile</th>
+                        <th style="border: 1px solid #dee2e6; padding: 12px; text-align: left; font-weight: bold;">Maps</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr style="background-color: #ffffff;">
+                        <td style="border: 1px solid #dee2e6; padding: 10px; text-align: center; font-weight: bold; color: #4facfe;">1</td>
+                        <td style="border: 1px solid #dee2e6; padding: 10px;"><strong>Dr. Allu Venkateswara Reddy</strong></td>
+                        <td style="border: 1px solid #dee2e6; padding: 10px;">Cardiologist</td>
+                        <td style="border: 1px solid #dee2e6; padding: 10px;">BDS</td>
+                        <td style="border: 1px solid #dee2e6; padding: 10px;">Bangalore, Bangalore</td>
+                        <td style="border: 1px solid #dee2e6; padding: 10px; text-align: center;"><strong style="color: #28a745;">100</strong></td>
+                        <td style="border: 1px solid #dee2e6; padding: 10px; text-align: center;"><a href="https://www.practo.com/bangalore/doctor/dr-allu-venkateshwara-reddy-dentist/recommended" target="_blank" style="color: #007bff; text-decoration: none; font-weight: bold;">View Profile</a></td>
+                        <td style="border: 1px solid #dee2e6; padding: 10px; text-align: center;"><a href="https://www.google.com/maps/search/Dr.+Allu+Venkateswara+Reddy+Bangalore" target="_blank" style="color: #007bff; text-decoration: none; font-weight: bold;">View Map</a></td>
+                    </tr>
+                    <tr style="background-color: #f8f9fa;">
+                        <td style="border: 1px solid #dee2e6; padding: 10px; text-align: center; font-weight: bold; color: #4facfe;">2</td>
+                        <td style="border: 1px solid #dee2e6; padding: 10px;"><strong>Dr. Shyam Padmanabhan</strong></td>
+                        <td style="border: 1px solid #dee2e6; padding: 10px;">Cardiologist</td>
+                        <td style="border: 1px solid #dee2e6; padding: 10px;">MD</td>
+                        <td style="border: 1px solid #dee2e6; padding: 10px;">Koramangala, Bangalore</td>
+                        <td style="border: 1px solid #dee2e6; padding: 10px; text-align: center;"><strong style="color: #28a745;">99</strong></td>
+                        <td style="border: 1px solid #dee2e6; padding: 10px; text-align: center;"><a href="https://www.practo.com/bangalore/doctor/dr-shyam-padmanabhan" target="_blank" style="color: #007bff; text-decoration: none; font-weight: bold;">View Profile</a></td>
+                        <td style="border: 1px solid #dee2e6; padding: 10px; text-align: center;"><a href="https://www.google.com/maps/search/Dr.+Shyam+Padmanabhan+Bangalore" target="_blank" style="color: #007bff; text-decoration: none; font-weight: bold;">View Map</a></td>
+                    </tr>
+                    <tr style="background-color: #ffffff;">
+                        <td style="border: 1px solid #dee2e6; padding: 10px; text-align: center; font-weight: bold; color: #4facfe;">3</td>
+                        <td style="border: 1px solid #dee2e6; padding: 10px;"><strong>Dr. Rajesh Kumar</strong></td>
+                        <td style="border: 1px solid #dee2e6; padding: 10px;">Cardiologist</td>
+                        <td style="border: 1px solid #dee2e6; padding: 10px;">DM</td>
+                        <td style="border: 1px solid #dee2e6; padding: 10px;">New Thippasandra, Bangalore</td>
+                        <td style="border: 1px solid #dee2e6; padding: 10px; text-align: center;"><strong style="color: #28a745;">98</strong></td>
+                        <td style="border: 1px solid #dee2e6; padding: 10px; text-align: center;"><a href="https://www.practo.com/bangalore/doctor/dr-rajesh-kumar" target="_blank" style="color: #007bff; text-decoration: none; font-weight: bold;">View Profile</a></td>
+                        <td style="border: 1px solid #dee2e6; padding: 10px; text-align: center;"><a href="https://www.google.com/maps/search/Dr.+Rajesh+Kumar+Bangalore" target="_blank" style="color: #007bff; text-decoration: none; font-weight: bold;">View Map</a></td>
+                    </tr>
+                </tbody>
+            </table>
+            
+            <div style="margin-top: 20px; padding: 15px; background: linear-gradient(45deg, #e9ecef, #f8f9fa); border-radius: 8px; font-family: Arial, sans-serif; border-left: 4px solid #4facfe;">
+                <h4 style="margin-top: 0; color: #495057; display: flex; align-items: center;"><i class="fas fa-clipboard-list" style="margin-right: 8px; color: #4facfe;"></i> Important Notes:</h4>
+                <ul style="margin-bottom: 0; color: #6c757d; line-height: 1.6;">
+                    <li>Please verify doctor availability before visiting</li>
+                    <li>Consultation fees may have changed</li>
+                    <li>In case of emergency, visit the nearest hospital immediately</li>
+                    <li>This is for informational purposes only</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+</body>
+</html>
