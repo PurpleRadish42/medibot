@@ -536,9 +536,12 @@ def api_forgot_password():
             }), 500
         
         # Send OTP email
+        print(f"📧 Attempting to send OTP email to {email}")
         email_sent = otp_service.send_otp_email(email, otp, "password_reset")
+        print(f"📧 Email sending result: {email_sent}")
         
         if not email_sent:
+            print(f"❌ Failed to send OTP email to {email}")
             return jsonify({
                 'success': False,
                 'message': 'Failed to send verification email. Please check your email address and try again.'
@@ -558,52 +561,50 @@ def api_forgot_password():
 
 @app.route('/api/reset-password', methods=['POST'])
 def api_reset_password():
-    """Handle password reset with OTP verification"""
+    """Handle password reset without OTP verification (OTP already verified)"""
     try:
         data = request.get_json()
         email = data.get('email', '').strip()
-        otp = data.get('otp', '').strip()
         new_password = data.get('newPassword', '')
         
-        if not all([email, otp, new_password]):
+        print(f"🔑 Password reset request for email: {email}")
+        
+        if not all([email, new_password]):
             return jsonify({
                 'success': False,
-                'message': 'Email, OTP, and new password are required'
+                'message': 'Email and new password are required'
             }), 400
         
-        # Verify OTP
-        verification_result = otp_service.verify_otp(email, otp)
-        
-        if not verification_result['success']:
+        # Check if user exists
+        conn = auth_db.get_connection()
+        cursor = conn.cursor()
+        cursor.execute("SELECT id FROM users WHERE email = %s", (email,))
+        if not cursor.fetchone():
+            conn.close()
             return jsonify({
                 'success': False,
-                'message': verification_result['message'],
-                'remaining_attempts': verification_result.get('remaining_attempts', 0)
+                'message': 'No account found with this email address'
             }), 400
+        conn.close()
         
-        # Check if this is for password reset
-        if verification_result.get('purpose') == 'password_reset':
-            # Reset password
-            success, message = auth_db.reset_user_password(email, new_password)
-            
-            if success:
-                return jsonify({
-                    'success': True,
-                    'message': 'Password reset successfully! You can now log in with your new password.'
-                })
-            else:
-                return jsonify({
-                    'success': False,
-                    'message': message
-                }), 400
+        # Reset password
+        success = auth_db.reset_user_password(email, new_password)
         
-        return jsonify({
-            'success': False,
-            'message': 'Invalid verification code'
-        }), 400
+        if success:
+            print(f"✅ Password reset successful for {email}")
+            return jsonify({
+                'success': True,
+                'message': 'Password reset successfully'
+            })
+        else:
+            print(f"❌ Password reset failed for {email}")
+            return jsonify({
+                'success': False,
+                'message': 'Failed to reset password. Please try again.'
+            }), 500
         
     except Exception as e:
-        print(f"Password reset error: {e}")
+        print(f"Reset password error: {e}")
         return jsonify({
             'success': False,
             'message': 'Password reset failed. Please try again.'

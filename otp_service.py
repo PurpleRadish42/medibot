@@ -123,6 +123,8 @@ class OTPService:
     def send_otp_email(self, email: str, otp: str, purpose: str = "registration") -> bool:
         """Send OTP via email"""
         try:
+            print(f"📧 send_otp_email called with email: {email}, purpose: {purpose}")
+            
             if purpose == "registration":
                 subject = "🔐 Verify Your Email - MediGuide Registration"
                 html_content = self._create_registration_otp_template(otp)
@@ -133,7 +135,10 @@ class OTPService:
                 subject = "🔐 Your Verification Code - MediGuide"
                 html_content = self._create_generic_otp_template(otp)
             
+            print(f"📧 Subject: {subject}")
+            print(f"📧 Calling email_service.send_email...")
             success = self.email_service.send_email(email, subject, html_content)
+            print(f"📧 Email service returned: {success}")
             
             if success:
                 print(f"✅ OTP email sent to {email}")

@@ -24,6 +24,15 @@ class EmailService:
         self.smtp_password = os.getenv('SMTP_PASSWORD', '')
         self.from_email = os.getenv('FROM_EMAIL', 'noreply@mediguide.ai')
         
+        # Check if SMTP credentials are configured
+        if not self.smtp_username or not self.smtp_password:
+            print("⚠️  WARNING: SMTP credentials not configured!")
+            print("📧 To enable email sending, set the following environment variables:")
+            print("   SMTP_USERNAME=your_smtp2go_username")
+            print("   SMTP_PASSWORD=your_smtp2go_password")
+            print("   FROM_EMAIL=noreply@yourdomain.com")
+            print("📧 Emails will not be sent until credentials are configured.")
+        
     def send_email(self, to_email: str, subject: str, html_content: str) -> bool:
         """
         Send email with custom subject and HTML content
@@ -37,6 +46,13 @@ class EmailService:
             bool: True if email sent successfully, False otherwise
         """
         try:
+            # Check if SMTP credentials are configured
+            if not self.smtp_username or not self.smtp_password:
+                print(f"❌ Cannot send email: SMTP credentials not configured")
+                print(f"📧 Email would have been sent to: {to_email}")
+                print(f"📧 Subject: {subject}")
+                return False
+                
             # Validate email address
             if not self._is_valid_email(to_email):
                 print(f"❌ Invalid email address: {to_email}")
