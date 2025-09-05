@@ -247,6 +247,98 @@
             margin: 2rem 0;
         }
         
+        .progress-bar {
+            width: 100%;
+            height: 6px;
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 3px;
+            margin: 1rem 0;
+            overflow: hidden;
+        }
+        
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(45deg, #4facfe, #00f2fe);
+            border-radius: 3px;
+            width: 0%;
+            transition: width 0.3s ease;
+        }
+        
+        .loading-details {
+            font-size: 0.9rem;
+            opacity: 0.8;
+            margin-top: 0.5rem;
+        }
+        
+        .condition-item {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 10px;
+            padding: 1rem;
+            margin-bottom: 1rem;
+            border-left: 4px solid #4facfe;
+        }
+        
+        .condition-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 0.5rem;
+        }
+        
+        .condition-name {
+            font-weight: bold;
+            font-size: 1.1rem;
+        }
+        
+        .confidence-score {
+            padding: 0.3rem 0.8rem;
+            border-radius: 20px;
+            font-weight: bold;
+            color: white;
+        }
+        
+        .confidence-score.urgent {
+            background: #ef4444;
+        }
+        
+        .confidence-score.moderate {
+            background: #f59e0b;
+        }
+        
+        .confidence-score.low {
+            background: #10b981;
+        }
+        
+        .condition-description {
+            font-size: 0.95rem;
+            opacity: 0.9;
+            line-height: 1.4;
+        }
+        
+        .urgency-note {
+            background: rgba(239, 68, 68, 0.2);
+            color: #fca5a5;
+            padding: 0.3rem 0.8rem;
+            border-radius: 15px;
+            font-size: 0.8rem;
+            margin-top: 0.5rem;
+            display: inline-block;
+        }
+        
+        .performance-info {
+            background: rgba(79, 172, 254, 0.2);
+            border-radius: 8px;
+            padding: 0.8rem;
+            margin-bottom: 1rem;
+            text-align: center;
+        }
+        
+        .analysis-meta {
+            font-size: 0.9rem;
+            margin: 0;
+            color: #93c5fd;
+        }
+        
         .spinner {
             border: 4px solid rgba(255, 255, 255, 0.3);
             border-radius: 50%;
@@ -421,7 +513,11 @@
 
         <div class="loading" id="loadingSection">
             <div class="spinner"></div>
-            <p>Analyzing your image... This may take a few moments.</p>
+            <p id="loadingText">Analyzing your image... This should take 5-10 seconds.</p>
+            <div class="progress-bar" id="progressBar">
+                <div class="progress-fill" id="progressFill"></div>
+            </div>
+            <p id="loadingDetails" class="loading-details">🔬 Processing image features...</p>
         </div>
 
         <div class="results-section" id="resultsSection">
@@ -542,23 +638,36 @@
                 return;
             }
 
+            // Show loading with progress
             document.getElementById('loadingSection').style.display = 'block';
             document.getElementById('previewSection').style.display = 'none';
             document.getElementById('resultsSection').style.display = 'none';
+            
+            // Start progress simulation
+            startProgressSimulation();
 
             const formData = new FormData();
             formData.append('image', selectedImage);
 
             try {
+                const startTime = Date.now();
+                
                 const response = await fetch('/api/v1/analyze-skin', {
                     method: 'POST',
                     body: formData
                 });
 
                 const data = await response.json();
+                const processingTime = (Date.now() - startTime) / 1000;
 
                 if (data.success) {
-                    displayResults(data.analysis);
+                    // Complete progress bar
+                    updateProgress(100, '✅ Analysis complete!');
+                    
+                    // Small delay to show completion
+                    setTimeout(() => {
+                        displayResults(data.analysis, processingTime);
+                    }, 500);
                 } else {
                     alert('Analysis failed: ' + (data.message || 'Unknown error'));
                 }
@@ -566,22 +675,80 @@
                 console.error('Analysis error:', error);
                 alert('Network error. Please check your connection and try again.');
             } finally {
-                document.getElementById('loadingSection').style.display = 'none';
+                setTimeout(() => {
+                    document.getElementById('loadingSection').style.display = 'none';
+                }, 1000);
             }
         }
 
-        function displayResults(analysis) {
+        function startProgressSimulation() {
+            let progress = 0;
+            const steps = [
+                { percent: 20, text: '🔍 Validating image...' },
+                { percent: 40, text: '🎨 Analyzing colors and textures...' },
+                { percent: 60, text: '📐 Extracting shape features...' },
+                { percent: 80, text: '🧠 Matching condition patterns...' },
+                { percent: 95, text: '🏥 Finding specialists...' }
+            ];
+            
+            let currentStep = 0;
+            
+            const interval = setInterval(() => {
+                if (currentStep < steps.length) {
+                    const step = steps[currentStep];
+                    updateProgress(step.percent, step.text);
+                    currentStep++;
+                } else {
+                    clearInterval(interval);
+                }
+            }, 800); // Update every 800ms for smooth progression
+        }
+        
+        function updateProgress(percent, text) {
+            const progressFill = document.getElementById('progressFill');
+            const loadingDetails = document.getElementById('loadingDetails');
+            
+            if (progressFill) {
+                progressFill.style.width = percent + '%';
+            }
+            if (loadingDetails) {
+                loadingDetails.textContent = text;
+            }
+        }
+
+        function displayResults(analysis, processingTime) {
             const conditionsList = document.getElementById('conditionsList');
             const specialistRecommendation = document.getElementById('specialistRecommendation');
 
+            // Display performance info
+            const performanceInfo = document.createElement('div');
+            performanceInfo.className = 'performance-info';
+            performanceInfo.innerHTML = `
+                <p class="analysis-meta">
+                    ⚡ ${analysis.analysis_type} completed in ${analysis.processing_time || processingTime || 'N/A'}s
+                    ${analysis.cache_hit ? ' (cached result)' : ''}
+                </p>
+            `;
+
             // Display conditions
             conditionsList.innerHTML = '';
-            analysis.conditions.forEach(condition => {
+            conditionsList.appendChild(performanceInfo);
+            
+            analysis.conditions.forEach((condition, index) => {
                 const conditionDiv = document.createElement('div');
                 conditionDiv.className = 'condition-item';
+                
+                // Add urgency indicator
+                const urgencyClass = condition.urgency === 'HIGH' ? 'urgent' : 
+                                   condition.urgency === 'MODERATE' ? 'moderate' : 'low';
+                
                 conditionDiv.innerHTML = `
-                    <div class="condition-name">${condition.name}</div>
-                    <div class="confidence-score">${condition.confidence}%</div>
+                    <div class="condition-header">
+                        <div class="condition-name">${condition.name}</div>
+                        <div class="confidence-score ${urgencyClass}">${condition.confidence}%</div>
+                    </div>
+                    <div class="condition-description">${condition.description}</div>
+                    ${condition.urgency !== 'LOW' ? `<div class="urgency-note">⚠️ ${condition.urgency} priority</div>` : ''}
                 `;
                 conditionsList.appendChild(conditionDiv);
             });
@@ -604,6 +771,14 @@
                             </div>
                         `).join('')}
                     </div>
+                ` : '<p>Consult your local dermatologist for professional evaluation.</p>'}
+            `;
+
+            document.getElementById('resultsSection').style.display = 'block';
+        }
+                            </div>
+                        `).join('')}
+                    </div>
                 ` : ''}
             `;
 
@@ -613,6 +788,93 @@
         function analyzeAnother() {
             document.getElementById('resultsSection').style.display = 'none';
             removeImage();
+        }
+
+        // File and camera handling functions
+        let currentStream = null;
+        let selectedImage = null;
+
+        function selectUploadOption() {
+            document.getElementById('uploadOption').classList.add('active');
+            document.getElementById('cameraOption').classList.remove('active');
+            document.getElementById('cameraSection').style.display = 'none';
+            document.getElementById('fileInput').click();
+        }
+
+        function selectCameraOption() {
+            document.getElementById('cameraOption').classList.add('active');
+            document.getElementById('uploadOption').classList.remove('active');
+            startCamera();
+        }
+
+        async function startCamera() {
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ 
+                    video: { facingMode: 'environment' } 
+                });
+                currentStream = stream;
+                document.getElementById('videoElement').srcObject = stream;
+                document.getElementById('cameraSection').style.display = 'block';
+            } catch (error) {
+                console.error('Error accessing camera:', error);
+                alert('Unable to access camera. Please use the upload option instead.');
+            }
+        }
+
+        function stopCamera() {
+            if (currentStream) {
+                currentStream.getTracks().forEach(track => track.stop());
+                currentStream = null;
+            }
+            document.getElementById('cameraSection').style.display = 'none';
+            document.getElementById('cameraOption').classList.remove('active');
+        }
+
+        function capturePhoto() {
+            const video = document.getElementById('videoElement');
+            const canvas = document.createElement('canvas');
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+            
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(video, 0, 0);
+            
+            canvas.toBlob((blob) => {
+                selectedImage = blob;
+                displayPreview(canvas.toDataURL());
+                stopCamera();
+            }, 'image/jpeg', 0.8);
+        }
+
+        function handleFileSelect(event) {
+            const file = event.target.files[0];
+            if (file) {
+                if (file.size > 10 * 1024 * 1024) { // 10MB limit
+                    alert('File size too large. Please select an image under 10MB.');
+                    return;
+                }
+                
+                selectedImage = file;
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    displayPreview(e.target.result);
+                };
+                reader.readAsDataURL(file);
+            }
+        }
+
+        function displayPreview(imageSrc) {
+            document.getElementById('imagePreview').src = imageSrc;
+            document.getElementById('previewSection').style.display = 'block';
+            document.getElementById('resultsSection').style.display = 'none';
+        }
+
+        function removeImage() {
+            selectedImage = null;
+            document.getElementById('previewSection').style.display = 'none';
+            document.getElementById('uploadOption').classList.remove('active');
+            document.getElementById('cameraOption').classList.remove('active');
+            document.getElementById('fileInput').value = '';
         }
 
         // Reset options on page load
